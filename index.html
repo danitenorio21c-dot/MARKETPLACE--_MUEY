@@ -1,0 +1,172 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MARKETPLACE MUEY</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <header class="encabezado">
+    <div class="logo-colegio">
+      <img
+        src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRnXUdOmpCJbuebVS9i8m68C7qo8svD-TCm5XgkoJfRZA&s=10"
+        alt="Escudo del colegio Almirante Alfredo Poveda Burbano"
+      >
+    </div>
+
+    <div class="titulo-principal">
+      <p class="subtitulo">COMPRA, VENDE Y COMPARTE</p>
+      <h1>MARKETPLACE MUEY</h1>
+      <p>Tu comunidad, más cerca que nunca</p>
+    </div>
+  </header>
+
+  <main class="contenedor-principal">
+
+    <section id="seccionLogin" class="panel">
+      <h2>¡Bienvenido!</h2>
+      <p>Ingresa o crea tu cuenta para continuar.</p>
+
+      <label for="usuario">Nombre de usuario</label>
+      <input
+        type="text"
+        id="usuario"
+        placeholder="Escribe tu usuario"
+        autocomplete="username"
+      >
+
+      <label for="clave">Contraseña</label>
+      <input
+        type="password"
+        id="clave"
+        placeholder="Escribe tu contraseña"
+        autocomplete="current-password"
+      >
+
+      <div class="botones-login">
+        <button id="btnIngresar" type="button">Iniciar sesión</button>
+        <button id="btnRegistrar" type="button" class="boton-secundario">
+          Crear cuenta
+        </button>
+      </div>
+
+      <p id="mensajeLogin" role="status"></p>
+    </section>
+
+    <section id="plataforma" hidden>
+      <div class="bienvenida panel">
+        <div>
+          <h2>Explora la comunidad</h2>
+          <p>Encuentra productos y servicios cerca de ti.</p>
+        </div>
+        <button id="btnCerrarSesion" type="button" class="boton-secundario">
+          Cerrar sesión
+        </button>
+      </div>
+
+      <section class="panel">
+        <h2>Publica tu producto o servicio</h2>
+        <p>Comparte lo que vendes con otras personas.</p>
+
+        <form id="formProducto">
+          <label for="nombre">Nombre del producto o servicio</label>
+          <input
+            type="text"
+            id="nombre"
+            placeholder="Ej.: Camiseta, comida, reparación..."
+            required
+          >
+
+          <label for="precio">Precio en dólares ($)</label>
+          <input
+            type="number"
+            id="precio"
+            placeholder="Ej.: 5.00"
+            min="0"
+            step="0.01"
+            required
+          >
+
+          <label for="descripcion">Descripción</label>
+          <textarea
+            id="descripcion"
+            placeholder="Describe lo que ofreces..."
+            rows="3"
+            required
+          ></textarea>
+
+          <label for="imagen">Enlace de la imagen (opcional)</label>
+          <input
+            type="url"
+            id="imagen"
+            placeholder="Pega aquí el enlace de una imagen"
+          >
+
+          <label for="categoria">Categoría</label>
+          <select id="categoria" required>
+            <option value="Productos">Productos</option>
+            <option value="Servicios">Servicios</option>
+          </select>
+
+          <button type="submit" id="btnPublicar">
+            Publicar ahora
+          </button>
+        </form>
+
+        <p id="estado" role="status"></p>
+      </section>
+
+      <section class="panel">
+        <div class="titulo-seccion">
+          <div>
+            <h2>Publicaciones de la comunidad</h2>
+            <p>Descubre lo que otras personas ofrecen.</p>
+          </div>
+
+          <label for="filtro">Filtrar:</label>
+          <select id="filtro">
+            <option value="Todos">Todos</option>
+            <option value="Productos">Productos</option>
+            <option value="Servicios">Servicios</option>
+          </select>
+        </div>
+
+        <div id="lista" class="lista-productos">
+          <p>Cargando publicaciones...</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Mensajes</h2>
+        <p>Espacio para comunicarte con otros usuarios.</p>
+
+        <div id="chat" class="chat">
+          <div id="mensajes" class="mensajes"></div>
+
+          <form id="formChat">
+            <input
+              type="text"
+              id="mensaje"
+              placeholder="Escribe un mensaje..."
+              autocomplete="off"
+            >
+            <button type="submit">Enviar</button>
+          </form>
+        </div>
+
+        <p id="estadoChat" role="status"></p>
+      </section>
+    </section>
+  </main>
+
+  <footer class="pie-pagina">
+    <p>MARKETPLACE MUEY · Una plataforma para nuestra comunidad</p>
+    <p>Proyecto educativo</p>
+  </footer>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>

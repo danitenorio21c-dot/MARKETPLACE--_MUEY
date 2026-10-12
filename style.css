@@ -1,0 +1,360 @@
+
+:root {
+  --azul: #123b65;
+  --azul-claro: #2369a8;
+  --dorado: #f4b942;
+  --fondo: #eef3f9;
+  --blanco: #ffffff;
+  --texto: #243447;
+  --borde: #dbe4ef;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--texto);
+  background:
+    linear-gradient(rgba(238, 243, 249, 0.91), rgba(238, 243, 249, 0.94)),
+    url("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRnXUdOmpCJbuebVS9i8m68C7qo8svD-TCm5XgkoJfRZA&s=10")
+    center 180px / 330px auto no-repeat fixed,
+    var(--fondo);
+}
+
+.encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 30px 20px;
+  color: white;
+  text-align: center;
+  background: linear-gradient(135deg, #102d4d, #2369a8);
+  border-bottom: 5px solid var(--dorado);
+  box-shadow: 0 5px 20px rgba(18, 59, 101, 0.22);
+}
+
+.logo-colegio {
+  flex-shrink: 0;
+  width: 105px;
+  height: 105px;
+  padding: 5px;
+  overflow: hidden;
+  background: white;
+  border: 3px solid var(--dorado);
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.logo-colegio img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+}
+
+.titulo-principal h1 {
+  margin: 5px 0 10px;
+  font-size: clamp(25px, 4vw, 42px);
+  letter-spacing: 1px;
+}
+
+.titulo-principal p {
+  margin: 6px 0;
+  color: #f4f7fc;
+}
+
+.titulo-principal .subtitulo {
+  color: var(--dorado);
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 3px;
+}
+
+.contenedor-principal {
+  width: min(1050px, 94%);
+  margin: 30px auto;
+}
+
+.panel {
+  margin-bottom: 25px;
+  padding: 25px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--borde);
+  border-radius: 18px;
+  box-shadow: 0 7px 25px rgba(27, 57, 88, 0.09);
+}
+
+.panel h2 {
+  margin-top: 0;
+  color: var(--azul);
+  font-size: 23px;
+}
+
+.panel p {
+  line-height: 1.6;
+}
+
+label {
+  display: block;
+  margin: 15px 0 7px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 12px 14px;
+  color: var(--texto);
+  font: inherit;
+  background: white;
+  border: 1px solid #cbd7e5;
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--azul-claro);
+  box-shadow: 0 0 0 3px rgba(35, 105, 168, 0.13);
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  padding: 12px 18px;
+  color: white;
+  font: inherit;
+  font-weight: bold;
+  background: linear-gradient(135deg, var(--azul-claro), var(--azul));
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 12px rgba(18, 59, 101, 0.2);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+#formProducto button {
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px;
+  background: linear-gradient(135deg, #f4b942, #e69b18);
+  color: #18314b;
+}
+
+.botones-login {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.boton-secundario {
+  color: var(--azul);
+  background: #e7eff8;
+  border: 1px solid #cbd9e9;
+}
+
+.bienvenida {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  background: linear-gradient(135deg, #ffffff, #eaf2fb);
+  border-left: 5px solid var(--dorado);
+}
+
+.bienvenida h2 {
+  margin-bottom: 5px;
+}
+
+.titulo-seccion {
+  display: grid;
+  grid-template-columns: 1fr minmax(150px, 220px);
+  align-items: center;
+  gap: 15px;
+}
+
+.titulo-seccion h2 {
+  margin-bottom: 5px;
+}
+
+.titulo-seccion p {
+  margin-top: 5px;
+}
+
+.lista-productos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-top: 25px;
+}
+
+.producto {
+  padding: 15px;
+  overflow: hidden;
+  background: white;
+  border: 1px solid var(--borde);
+  border-radius: 15px;
+  box-shadow: 0 4px 14px rgba(27, 57, 88, 0.08);
+}
+
+.producto img {
+  display: block;
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+  background: #eaf0f6;
+  border-radius: 10px;
+}
+
+.producto h3 {
+  margin: 14px 0 8px;
+  color: var(--azul);
+}
+
+.producto p {
+  overflow-wrap: anywhere;
+}
+
+.producto .precio {
+  color: #167344;
+  font-size: 22px;
+  font-weight: bold;
+}
+
+.producto .categoria {
+  display: inline-block;
+  padding: 6px 10px;
+  color: var(--azul);
+  font-size: 12px;
+  font-weight: bold;
+  background: #e7eff8;
+  border-radius: 20px;
+}
+
+.chat {
+  padding: 15px;
+  background: #f3f7fc;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+}
+
+.mensajes {
+  min-height: 70px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+#formChat {
+  display: flex;
+  gap: 10px;
+}
+
+#formChat input {
+  flex: 1;
+  min-width: 0;
+}
+
+#formChat button {
+  flex-shrink: 0;
+}
+
+#estado,
+#mensajeLogin,
+#estadoChat {
+  color: var(--azul);
+  font-weight: bold;
+}
+
+.pie-pagina {
+  padding: 22px 15px;
+  color: white;
+  text-align: center;
+  background: #102d4d;
+  border-top: 4px solid var(--dorado);
+}
+
+.pie-pagina p {
+  margin: 5px;
+  font-size: 13px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 600px) {
+  .encabezado {
+    flex-direction: column;
+    gap: 12px;
+    padding: 24px 12px;
+  }
+
+  .logo-colegio {
+    width: 85px;
+    height: 85px;
+  }
+
+  .titulo-principal h1 {
+    font-size: 27px;
+  }
+
+  .titulo-principal .subtitulo {
+    letter-spacing: 1px;
+  }
+
+  .contenedor-principal {
+    width: 94%;
+    margin: 18px auto;
+  }
+
+  .panel {
+    padding: 17px;
+    border-radius: 14px;
+  }
+
+  .bienvenida {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .titulo-seccion {
+    grid-template-columns: 1fr;
+  }
+
+  #formChat {
+    flex-direction: column;
+  }
+
+  #formChat button {
+    width: 100%;
+  }
+
+  .lista-productos {
+    grid-template-columns: 1fr;
+  }
+}
