@@ -368,8 +368,3 @@ $("formChat").addEventListener("submit", (evento) => {
 actualizarPantalla();
 mostrarProductos();
 
-  campo.value = "";
-});
-
-actualizarPantalla();
-mostrarProductos();
