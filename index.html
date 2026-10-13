@@ -98,12 +98,19 @@
             required
           ></textarea>
 
-          <label for="imagen">Enlace de la imagen (opcional)</label>
+          <label for="imagen">Agregar foto del producto</label>
           <input
-            type="url"
+            type="file"
             id="imagen"
-            placeholder="Pega aquí el enlace de una imagen"
+            accept="image/*"
+            required
           >
+          <img
+            id="vistaPrevia"
+            alt="Vista previa de la foto"
+            hidden
+            style="max-width:220px; max-height:220px; object-fit:contain; margin-top:12px; border-radius:12px;"
+          > 
 
           <label for="categoria">Categoría</label>
           <select id="categoria" required>
