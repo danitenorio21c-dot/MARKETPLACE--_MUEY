@@ -1,16 +1,27 @@
 
-import { db } from "./firebase.js";
+
+import { db, storage } from "./firebase.js";
+
 import {
   collection,
   addDoc,
   onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  doc,
+  setDoc
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js";
 
 const $ = (id) => document.getElementById(id);
 
 let usuarioActual = localStorage.getItem("usuarioActual") || "";
 let productos = [];
+let perfiles = {};
 let filtroActual = "Todos";
 
 const seccionLogin = $("seccionLogin");
@@ -24,6 +35,7 @@ function mostrarEstado(texto, elemento = "estado") {
 function actualizarPantalla() {
   seccionLogin.hidden = Boolean(usuarioActual);
   plataforma.hidden = !usuarioActual;
+  mostrarPerfil();
 }
 
 function registrar() {
@@ -76,6 +88,100 @@ $("btnRegistrar").addEventListener("click", registrar);
 $("btnIngresar").addEventListener("click", iniciarSesion);
 $("btnCerrarSesion").addEventListener("click", cerrarSesion);
 
+// Panel del perfil
+const panelPerfil = document.createElement("section");
+panelPerfil.className = "panel-perfil";
+panelPerfil.style.cssText =
+  "display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:15px;margin-bottom:20px;";
+
+panelPerfil.innerHTML = `
+  <img id="fotoPerfilActual" alt="Foto de perfil"
+    style="width:55px;height:55px;border-radius:50%;object-fit:cover;display:none;">
+  <strong id="nombrePerfilActual"></strong>
+  <label for="fotoPerfil">Foto de perfil (opcional)</label>
+  <input type="file" id="fotoPerfil" accept="image/*">
+  <button type="button" id="btnGuardarPerfil">Guardar foto</button>
+  <p id="estadoPerfil"></p>
+`;
+
+plataforma.prepend(panelPerfil);
+
+function mostrarPerfil() {
+  $("nombrePerfilActual").textContent = usuarioActual
+    ? `Usuario: ${usuarioActual}`
+    : "";
+
+  const foto = $("fotoPerfilActual");
+  const url = perfiles[usuarioActual]?.foto;
+
+  if (url) {
+    foto.src = url;
+    foto.style.display = "block";
+  } else {
+    foto.removeAttribute("src");
+    foto.style.display = "none";
+  }
+}
+
+$("btnGuardarPerfil").addEventListener("click", async () => {
+  if (!usuarioActual) return;
+
+  const archivo = $("fotoPerfil").files[0];
+
+  if (!archivo) {
+    mostrarEstado("Selecciona una foto primero.", "estadoPerfil");
+    return;
+  }
+
+  if (!archivo.type.startsWith("image/") || archivo.size > 5 * 1024 * 1024) {
+    mostrarEstado("Elige una imagen de máximo 5 MB.", "estadoPerfil");
+    return;
+  }
+
+  const boton = $("btnGuardarPerfil");
+  boton.disabled = true;
+  mostrarEstado("Guardando foto...", "estadoPerfil");
+
+  try {
+    const archivoRef = ref(
+      storage,
+      `perfiles/${encodeURIComponent(usuarioActual)}_${Date.now()}`
+    );
+
+    await uploadBytes(archivoRef, archivo);
+    const url = await getDownloadURL(archivoRef);
+
+    await setDoc(doc(db, "perfiles", usuarioActual), {
+      usuario: usuarioActual,
+      foto: url,
+      actualizado: serverTimestamp()
+    }, { merge: true });
+
+    $("fotoPerfil").value = "";
+    mostrarEstado("Foto de perfil guardada.", "estadoPerfil");
+  } catch (error) {
+    console.error(error);
+    mostrarEstado("Error al guardar. Revisa las reglas de Firebase.", "estadoPerfil");
+  } finally {
+    boton.disabled = false;
+  }
+});
+
+// Cargar perfiles
+onSnapshot(collection(db, "perfiles"), (resultado) => {
+  perfiles = {};
+
+  resultado.docs.forEach((documento) => {
+    perfiles[documento.id] = documento.data();
+  });
+
+  mostrarPerfil();
+  mostrarProductos();
+}, (error) => {
+  console.error(error);
+});
+
+// Publicar productos con foto
 $("formProducto").addEventListener("submit", async (evento) => {
   evento.preventDefault();
 
@@ -87,7 +193,7 @@ $("formProducto").addEventListener("submit", async (evento) => {
   const nombre = $("nombre").value.trim();
   const precio = Number($("precio").value);
   const descripcion = $("descripcion").value.trim();
-  const imagen = $("imagen").value.trim();
+  const archivo = $("imagen").files[0];
   const categoria = $("categoria").value;
 
   if (!nombre || !descripcion || !Number.isFinite(precio) || precio < 0) {
@@ -95,16 +201,32 @@ $("formProducto").addEventListener("submit", async (evento) => {
     return;
   }
 
+  if (!archivo) {
+    mostrarEstado("Selecciona una foto del producto.");
+    return;
+  }
+
+  if (!archivo.type.startsWith("image/") || archivo.size > 5 * 1024 * 1024) {
+    mostrarEstado("La foto debe ser una imagen de máximo 5 MB.");
+    return;
+  }
+
   const boton = $("btnPublicar");
   boton.disabled = true;
-  mostrarEstado("Publicando producto...");
+  mostrarEstado("Subiendo foto y publicando producto...");
 
   try {
+    const nombreArchivo = archivo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const archivoRef = ref(storage, `productos/${Date.now()}_${nombreArchivo}`);
+
+    await uploadBytes(archivoRef, archivo);
+    const urlImagen = await getDownloadURL(archivoRef);
+
     await addDoc(collection(db, "productos"), {
       nombre,
       precio,
       descripcion,
-      imagen,
+      imagen: urlImagen,
       categoria,
       vendedor: usuarioActual,
       creado: serverTimestamp()
@@ -114,36 +236,41 @@ $("formProducto").addEventListener("submit", async (evento) => {
     mostrarEstado("¡Producto publicado correctamente!");
   } catch (error) {
     console.error(error);
-    mostrarEstado("No se pudo publicar. Revisa tu conexión y las reglas de Firebase.");
+    mostrarEstado("No se pudo publicar. Revisa Storage y Firestore.");
   } finally {
     boton.disabled = false;
   }
 });
 
-onSnapshot(
-  collection(db, "productos"),
-  (resultado) => {
-    productos = resultado.docs.map((documento) => ({
-      id: documento.id,
-      ...documento.data()
-    }));
+// Mostrar publicaciones nuevas primero
+onSnapshot(collection(db, "productos"), (resultado) => {
+  productos = resultado.docs.map((documento) => ({
+    id: documento.id,
+    ...documento.data()
+  }));
 
-    mostrarProductos();
-    mostrarEstado("");
-  },
-  (error) => {
-    console.error(error);
-    mostrarEstado("No se pudieron cargar los productos. Revisa las reglas de Firebase.");
-  }
-);
+  productos.sort((a, b) => {
+    const fechaA = a.creado?.toMillis?.() || 0;
+    const fechaB = b.creado?.toMillis?.() || 0;
+    return fechaB - fechaA;
+  });
+
+  mostrarProductos();
+  mostrarEstado("");
+}, (error) => {
+  console.error(error);
+  mostrarEstado("No se pudieron cargar los productos. Revisa Firestore.");
+});
 
 function mostrarProductos() {
   const lista = $("lista");
+  if (!lista) return;
+
   lista.replaceChildren();
 
-  const encontrados = productos.filter((producto) => {
-    return filtroActual === "Todos" || producto.categoria === filtroActual;
-  });
+  const encontrados = productos.filter((producto) =>
+    filtroActual === "Todos" || producto.categoria === filtroActual
+  );
 
   if (encontrados.length === 0) {
     const mensaje = document.createElement("p");
@@ -155,46 +282,64 @@ function mostrarProductos() {
   encontrados.forEach((producto) => {
     const tarjeta = document.createElement("article");
     tarjeta.className = "producto";
+    tarjeta.style.cssText =
+      "max-width:500px;margin:20px auto;background:white;border:1px solid #ddd;border-radius:12px;overflow:hidden;color:#222;";
 
-    if (producto.imagen) {
-      try {
-        const direccion = new URL(producto.imagen);
+    // Nombre y foto del vendedor
+    const encabezado = document.createElement("div");
+    encabezado.style.cssText =
+      "display:flex;align-items:center;gap:10px;padding:12px;";
 
-        if (direccion.protocol === "https:" || direccion.protocol === "http:") {
-          const foto = document.createElement("img");
-          foto.src = direccion.href;
-          foto.alt = producto.nombre || "Imagen del producto";
-          foto.loading = "lazy";
-          foto.onerror = () => foto.remove();
-          tarjeta.appendChild(foto);
-        }
-      } catch (error) {
-        // Si el enlace no es válido, se muestra el producto sin imagen.
-      }
+    const perfil = perfiles[producto.vendedor];
+
+    if (perfil?.foto) {
+      const avatar = document.createElement("img");
+      avatar.src = perfil.foto;
+      avatar.alt = "Foto de perfil";
+      avatar.style.cssText =
+        "width:42px;height:42px;border-radius:50%;object-fit:cover;";
+      encabezado.appendChild(avatar);
     }
 
-    const nombre = document.createElement("h3");
-    nombre.textContent = producto.nombre || "Producto";
-    tarjeta.appendChild(nombre);
+    const vendedor = document.createElement("strong");
+    vendedor.textContent = producto.vendedor || "Usuario";
+    encabezado.appendChild(vendedor);
+    tarjeta.appendChild(encabezado);
 
-    const precio = document.createElement("p");
+    // Foto del producto
+    if (producto.imagen) {
+      const foto = document.createElement("img");
+      foto.src = producto.imagen;
+      foto.alt = producto.nombre || "Foto del producto";
+      foto.loading = "lazy";
+      foto.style.cssText =
+        "display:block;width:100%;max-height:500px;object-fit:contain;background:#f5f5f5;";
+      tarjeta.appendChild(foto);
+    }
+
+    // Precio y descripción
+    const contenido = document.createElement("div");
+    contenido.style.cssText = "padding:14px;";
+
+    const precio = document.createElement("h3");
     precio.className = "precio";
     precio.textContent = `$${Number(producto.precio || 0).toFixed(2)}`;
-    tarjeta.appendChild(precio);
+    contenido.appendChild(precio);
+
+    const nombre = document.createElement("strong");
+    nombre.textContent = producto.nombre || "Producto";
+    contenido.appendChild(nombre);
 
     const descripcion = document.createElement("p");
     descripcion.textContent = producto.descripcion || "";
-    tarjeta.appendChild(descripcion);
+    contenido.appendChild(descripcion);
 
     const categoria = document.createElement("span");
     categoria.className = "categoria";
     categoria.textContent = producto.categoria || "Productos";
-    tarjeta.appendChild(categoria);
+    contenido.appendChild(categoria);
 
-    const vendedor = document.createElement("p");
-    vendedor.textContent = `Vendedor: ${producto.vendedor || "Usuario"}`;
-    tarjeta.appendChild(vendedor);
-
+    tarjeta.appendChild(contenido);
     lista.appendChild(tarjeta);
   });
 }
@@ -204,6 +349,7 @@ $("filtro").addEventListener("change", (evento) => {
   mostrarProductos();
 });
 
+// Chat actual: solo se muestra en este navegador.
 $("formChat").addEventListener("submit", (evento) => {
   evento.preventDefault();
 
@@ -215,6 +361,12 @@ $("formChat").addEventListener("submit", (evento) => {
   const mensaje = document.createElement("p");
   mensaje.textContent = `${usuarioActual}: ${texto}`;
   $("mensajes").appendChild(mensaje);
+
+  campo.value = "";
+});
+
+actualizarPantalla();
+mostrarProductos();
 
   campo.value = "";
 });
