@@ -1,6 +1,7 @@
 
 
-import { db, storage } from "./firebase.js";
+
+import { db } from "./firebase.js";
 
 import {
   collection,
@@ -10,12 +11,6 @@ import {
   doc,
   setDoc
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
-
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL
-} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -88,6 +83,48 @@ $("btnRegistrar").addEventListener("click", registrar);
 $("btnIngresar").addEventListener("click", iniciarSesion);
 $("btnCerrarSesion").addEventListener("click", cerrarSesion);
 
+// Comprimir las fotos para intentar guardarlas en Firestore
+function comprimirFoto(archivo) {
+  return new Promise((resolve, reject) => {
+    if (!archivo || !archivo.type.startsWith("image/")) {
+      reject(new Error("Selecciona un archivo de imagen válido."));
+      return;
+    }
+
+    const lector = new FileReader();
+
+    lector.onerror = () => reject(new Error("No se pudo leer la foto."));
+
+    lector.onload = () => {
+      const imagen = new Image();
+
+      imagen.onerror = () => reject(new Error("La imagen no es válida."));
+
+      imagen.onload = () => {
+        const maximo = 400;
+        const escala = Math.min(
+          1,
+          maximo / Math.max(imagen.width, imagen.height)
+        );
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(imagen.width * escala));
+        canvas.height = Math.max(1, Math.round(imagen.height * escala));
+
+        const contexto = canvas.getContext("2d");
+        contexto.drawImage(imagen, 0, 0, canvas.width, canvas.height);
+
+        // JPEG reduce el tamaño; calidad baja para respetar límites.
+        resolve(canvas.toDataURL("image/jpeg", 0.45));
+      };
+
+      imagen.src = lector.result;
+    };
+
+    lector.readAsDataURL(archivo);
+  });
+}
+
 // Panel del perfil
 const panelPerfil = document.createElement("section");
 panelPerfil.className = "panel-perfil";
@@ -133,27 +170,16 @@ $("btnGuardarPerfil").addEventListener("click", async () => {
     return;
   }
 
-  if (!archivo.type.startsWith("image/") || archivo.size > 5 * 1024 * 1024) {
-    mostrarEstado("Elige una imagen de máximo 5 MB.", "estadoPerfil");
-    return;
-  }
-
   const boton = $("btnGuardarPerfil");
   boton.disabled = true;
-  mostrarEstado("Guardando foto...", "estadoPerfil");
+  mostrarEstado("Comprimiendo y guardando foto...", "estadoPerfil");
 
   try {
-    const archivoRef = ref(
-      storage,
-      `perfiles/${encodeURIComponent(usuarioActual)}_${Date.now()}`
-    );
-
-    await uploadBytes(archivoRef, archivo);
-    const url = await getDownloadURL(archivoRef);
+    const foto = await comprimirFoto(archivo);
 
     await setDoc(doc(db, "perfiles", usuarioActual), {
       usuario: usuarioActual,
-      foto: url,
+      foto,
       actualizado: serverTimestamp()
     }, { merge: true });
 
@@ -161,13 +187,16 @@ $("btnGuardarPerfil").addEventListener("click", async () => {
     mostrarEstado("Foto de perfil guardada.", "estadoPerfil");
   } catch (error) {
     console.error(error);
-    mostrarEstado("Error al guardar. Revisa las reglas de Firebase.", "estadoPerfil");
+    mostrarEstado(
+      "No se pudo guardar. La foto puede superar el límite de Firestore.",
+      "estadoPerfil"
+    );
   } finally {
     boton.disabled = false;
   }
 });
 
-// Cargar perfiles
+// Cargar perfiles de los vendedores
 onSnapshot(collection(db, "perfiles"), (resultado) => {
   perfiles = {};
 
@@ -179,9 +208,10 @@ onSnapshot(collection(db, "perfiles"), (resultado) => {
   mostrarProductos();
 }, (error) => {
   console.error(error);
+  mostrarEstado("No se pudieron cargar los perfiles.");
 });
 
-// Publicar productos con foto
+// Publicar productos
 $("formProducto").addEventListener("submit", async (evento) => {
   evento.preventDefault();
 
@@ -206,27 +236,18 @@ $("formProducto").addEventListener("submit", async (evento) => {
     return;
   }
 
-  if (!archivo.type.startsWith("image/") || archivo.size > 5 * 1024 * 1024) {
-    mostrarEstado("La foto debe ser una imagen de máximo 5 MB.");
-    return;
-  }
-
   const boton = $("btnPublicar");
   boton.disabled = true;
-  mostrarEstado("Subiendo foto y publicando producto...");
+  mostrarEstado("Comprimiendo foto y publicando producto...");
 
   try {
-    const nombreArchivo = archivo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const archivoRef = ref(storage, `productos/${Date.now()}_${nombreArchivo}`);
-
-    await uploadBytes(archivoRef, archivo);
-    const urlImagen = await getDownloadURL(archivoRef);
+    const imagen = await comprimirFoto(archivo);
 
     await addDoc(collection(db, "productos"), {
       nombre,
       precio,
       descripcion,
-      imagen: urlImagen,
+      imagen,
       categoria,
       vendedor: usuarioActual,
       creado: serverTimestamp()
@@ -236,7 +257,9 @@ $("formProducto").addEventListener("submit", async (evento) => {
     mostrarEstado("¡Producto publicado correctamente!");
   } catch (error) {
     console.error(error);
-    mostrarEstado("No se pudo publicar. Revisa Storage y Firestore.");
+    mostrarEstado(
+      "No se pudo publicar. Revisa las reglas y el límite de Firestore."
+    );
   } finally {
     boton.disabled = false;
   }
@@ -285,7 +308,6 @@ function mostrarProductos() {
     tarjeta.style.cssText =
       "max-width:500px;margin:20px auto;background:white;border:1px solid #ddd;border-radius:12px;overflow:hidden;color:#222;";
 
-    // Nombre y foto del vendedor
     const encabezado = document.createElement("div");
     encabezado.style.cssText =
       "display:flex;align-items:center;gap:10px;padding:12px;";
@@ -306,7 +328,6 @@ function mostrarProductos() {
     encabezado.appendChild(vendedor);
     tarjeta.appendChild(encabezado);
 
-    // Foto del producto
     if (producto.imagen) {
       const foto = document.createElement("img");
       foto.src = producto.imagen;
@@ -317,7 +338,6 @@ function mostrarProductos() {
       tarjeta.appendChild(foto);
     }
 
-    // Precio y descripción
     const contenido = document.createElement("div");
     contenido.style.cssText = "padding:14px;";
 
@@ -349,7 +369,7 @@ $("filtro").addEventListener("change", (evento) => {
   mostrarProductos();
 });
 
-// Chat actual: solo se muestra en este navegador.
+// Chat: por ahora solo aparece en este navegador.
 $("formChat").addEventListener("submit", (evento) => {
   evento.preventDefault();
 
@@ -367,4 +387,3 @@ $("formChat").addEventListener("submit", (evento) => {
 
 actualizarPantalla();
 mostrarProductos();
-
