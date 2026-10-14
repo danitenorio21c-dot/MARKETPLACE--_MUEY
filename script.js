@@ -1,7 +1,3 @@
-
-
-
-
 import { db } from "./firebase.js";
 
 import {
@@ -16,13 +12,11 @@ import {
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CONEXIÓN CON SUPABASE
 const SUPABASE_URL = "https://pkbcoyelqegbxbrxefbk.supabase.co";
 const SUPABASE_KEY = "sb_publishable_kk9cmEuMm3RdJ11P7stVlA_WYQytzeX";
 const SUPABASE_BUCKET = "FOTOS MUEY";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
 const $ = (id) => document.getElementById(id);
 
 let usuarioActual = localStorage.getItem("usuarioActual") || "";
@@ -30,83 +24,102 @@ let productos = [];
 let perfiles = {};
 let filtroActual = "Todos";
 
-const seccionLogin = $("seccionLogin");
-const plataforma = $("plataforma");
+/* TIEMPO LIMITE */
+function conTiempoLimite(promesa, segundos, operacion) {
+  let temporizador;
 
-function mostrarEstado(texto, elemento = "estado") {
-  const destino = $(elemento);
-  if (destino) destino.textContent = texto;
+  const limite = new Promise((_, reject) => {
+    temporizador = setTimeout(() => {
+      reject(new Error(
+        `${operacion} tardó más de ${segundos} segundos. Revisa tu conexión y la configuración del servicio.`
+      ));
+    }, segundos * 1000);
+  });
+
+  return Promise.race([promesa, limite]).finally(() => {
+    clearTimeout(temporizador);
+  });
 }
 
-function actualizarPantalla() {
-  seccionLogin.hidden = Boolean(usuarioActual);
-  plataforma.hidden = !usuarioActual;
-  mostrarPerfil();
+/* MENSAJES */
+function mostrarEstado(texto) {
+  const estado = $("estado");
+  if (estado) estado.textContent = texto || "";
 }
 
-function registrar() {
+/* REGISTRO */
+async function registrar() {
   const usuario = $("usuario").value.trim();
   const clave = $("clave").value;
 
   if (!usuario || !clave) {
-    mostrarEstado("Escribe tu usuario y contraseña.", "mensajeLogin");
+    $("mensajeLogin").textContent = "Escribe tu usuario y contraseña.";
     return;
   }
 
-  const cuentas = JSON.parse(
-    localStorage.getItem("cuentasMuey") || "{}"
-  );
+  if (clave.length < 4) {
+    $("mensajeLogin").textContent =
+      "La contraseña debe tener al menos 4 caracteres.";
+    return;
+  }
+
+  const cuentas = JSON.parse(localStorage.getItem("cuentasMuey") || "{}");
 
   if (cuentas[usuario]) {
-    mostrarEstado("Ese usuario ya existe.", "mensajeLogin");
+    $("mensajeLogin").textContent = "Ese usuario ya existe.";
     return;
   }
 
   cuentas[usuario] = clave;
   localStorage.setItem("cuentasMuey", JSON.stringify(cuentas));
-  localStorage.setItem("usuarioActual", usuario);
+
   usuarioActual = usuario;
+  localStorage.setItem("usuarioActual", usuario);
 
   actualizarPantalla();
-  mostrarEstado("Cuenta creada correctamente.", "mensajeLogin");
 }
 
-function iniciarSesion() {
+/* INICIAR SESION */
+async function iniciarSesion() {
   const usuario = $("usuario").value.trim();
   const clave = $("clave").value;
 
-  const cuentas = JSON.parse(
-    localStorage.getItem("cuentasMuey") || "{}"
-  );
+  const cuentas = JSON.parse(localStorage.getItem("cuentasMuey") || "{}");
 
-  if (cuentas[usuario] && cuentas[usuario] === clave) {
-    usuarioActual = usuario;
-    localStorage.setItem("usuarioActual", usuario);
-    actualizarPantalla();
-    mostrarEstado("Sesión iniciada.", "mensajeLogin");
-  } else {
-    mostrarEstado(
-      "Datos incorrectos o cuenta no registrada.",
-      "mensajeLogin"
-    );
+  if (!cuentas[usuario] || cuentas[usuario] !== clave) {
+    $("mensajeLogin").textContent = "Datos incorrectos.";
+    return;
   }
-}
 
-function cerrarSesion() {
-  localStorage.removeItem("usuarioActual");
-  usuarioActual = "";
+  usuarioActual = usuario;
+  localStorage.setItem("usuarioActual", usuario);
+
   actualizarPantalla();
 }
 
-$("btnRegistrar").addEventListener("click", registrar);
-$("btnIngresar").addEventListener("click", iniciarSesion);
-$("btnCerrarSesion").addEventListener("click", cerrarSesion);
+/* CERRAR SESION */
+function cerrarSesion() {
+  usuarioActual = "";
+  localStorage.removeItem("usuarioActual");
+  actualizarPantalla();
+}
 
-// COMPRIMIR FOTOS
+/* PANTALLA */
+function actualizarPantalla() {
+  const login = $("seccionLogin");
+  const plataforma = $("plataforma");
+
+  if (login) login.style.display = usuarioActual ? "none" : "block";
+  if (plataforma) plataforma.style.display = usuarioActual ? "block" : "none";
+
+  if (usuarioActual) mostrarPerfil();
+}
+
+/* COMPRIMIR FOTO */
 function comprimirFoto(archivo) {
   return new Promise((resolve, reject) => {
-    if (!archivo || !archivo.type.startsWith("image/")) {
-      reject(new Error("Selecciona una imagen válida."));
+    if (!archivo) {
+      reject(new Error("Selecciona una foto."));
       return;
     }
 
@@ -116,242 +129,227 @@ function comprimirFoto(archivo) {
       reject(new Error("No se pudo leer la foto."));
 
     lector.onload = () => {
-      const imagen = new Image();
+      const img = new Image();
 
-      imagen.onerror = () =>
-        reject(new Error("La imagen no es válida."));
+      img.onerror = () =>
+        reject(new Error("El archivo seleccionado no es una imagen válida."));
 
-      imagen.onload = () => {
-        const maximo = 1000;
-        const escala = Math.min(
-          1,
-          maximo / Math.max(imagen.width, imagen.height)
-        );
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const maximo = 1200;
 
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(
-          1,
-          Math.round(imagen.width * escala)
-        );
-        canvas.height = Math.max(
-          1,
-          Math.round(imagen.height * escala)
-        );
+          let ancho = img.width;
+          let alto = img.height;
 
-        const contexto = canvas.getContext("2d");
+          if (ancho > alto && ancho > maximo) {
+            alto = Math.round(alto * maximo / ancho);
+            ancho = maximo;
+          } else if (alto >= ancho && alto > maximo) {
+            ancho = Math.round(ancho * maximo / alto);
+            alto = maximo;
+          }
 
-        contexto.drawImage(
-          imagen,
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        );
+          canvas.width = ancho;
+          canvas.height = alto;
 
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
+          const contexto = canvas.getContext("2d");
+
+          if (!contexto) {
+            reject(new Error("No se pudo procesar la foto."));
+            return;
+          }
+
+          contexto.drawImage(img, 0, 0, ancho, alto);
+
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error("No se pudo comprimir la foto."));
+                return;
+              }
+
               resolve(blob);
-            } else {
-              reject(new Error("No se pudo comprimir la foto."));
-            }
-          },
-          "image/jpeg",
-          0.75
-        );
+            },
+            "image/jpeg",
+            0.75
+          );
+        } catch (error) {
+          reject(error);
+        }
       };
 
-      lector.src = lector.result;
+      img.src = lector.result;
     };
 
     lector.readAsDataURL(archivo);
   });
 }
 
-// SUBIR FOTO A SUPABASE
-async function subirFoto(archivo, carpeta) {
-  const imagen = await comprimirFoto(archivo);
+/* SUBIR FOTO A SUPABASE */
+async function subirFoto(archivo, carpeta, informarEstado = () => {}) {
+  informarEstado("1/3: Comprimiendo foto...");
+
+  const imagen = await conTiempoLimite(
+    comprimirFoto(archivo),
+    30,
+    "La compresión de la foto"
+  );
 
   const ruta =
-    `${carpeta}/${Date.now()}-` +
-    `${Math.random().toString(36).slice(2)}.jpg`;
+    `${carpeta}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
 
-  const { error } = await supabase.storage
-    .from(SUPABASE_BUCKET)
-    .upload(ruta, imagen, {
+  informarEstado("2/3: Subiendo foto a Supabase...");
+
+  const resultado = await conTiempoLimite(
+    supabase.storage.from(SUPABASE_BUCKET).upload(ruta, imagen, {
       contentType: "image/jpeg",
       upsert: false
-    });
+    }),
+    30,
+    "La subida de la foto a Supabase"
+  );
 
-  if (error) throw error;
+  if (resultado.error) {
+    throw new Error("Supabase: " + resultado.error.message);
+  }
 
   const { data } = supabase.storage
     .from(SUPABASE_BUCKET)
     .getPublicUrl(ruta);
 
+  if (!data?.publicUrl) {
+    throw new Error("No se obtuvo la dirección pública de la foto.");
+  }
+
   return data.publicUrl;
 }
 
-// PANEL DEL PERFIL Y FOTO
-const panelPerfil = document.createElement("section");
-panelPerfil.className = "panel-perfil";
-panelPerfil.style.cssText =
-  "display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:15px;margin-bottom:20px;";
-
-panelPerfil.innerHTML = `
-  <img id="fotoPerfilActual" alt="Foto de perfil"
-    style="width:55px;height:55px;border-radius:50%;object-fit:cover;display:none;">
-  <strong id="nombrePerfilActual"></strong>
-  <label for="fotoPerfil">Foto de perfil (opcional)</label>
-  <input type="file" id="fotoPerfil" accept="image/*">
-  <button type="button" id="btnGuardarPerfil">Guardar foto</button>
-  <p id="estadoPerfil"></p>
-`;
-
-plataforma.prepend(panelPerfil);
-
+/* PERFIL */
 function mostrarPerfil() {
-  $("nombrePerfilActual").textContent = usuarioActual
-    ? `Usuario: ${usuarioActual}`
-    : "";
+  let panel = $("panelPerfil");
 
-  const foto = $("fotoPerfilActual");
-  const url = perfiles[usuarioActual]?.foto;
+  if (!panel) {
+    panel = document.createElement("div");
+    panel.id = "panelPerfil";
 
-  if (url) {
-    foto.src = url;
-    foto.style.display = "block";
-  } else {
-    foto.removeAttribute("src");
-    foto.style.display = "none";
+    const plataforma = $("plataforma");
+    if (!plataforma) return;
+
+    plataforma.prepend(panel);
   }
 
-  // Cargar el WhatsApp guardado del vendedor
-  const campoTelefono = $("telefonoPerfil");
+  const perfil = perfiles[usuarioActual] || {};
 
-  if (
-    campoTelefono &&
-    document.activeElement !== campoTelefono
-  ) {
-    campoTelefono.value =
-      perfiles[usuarioActual]?.telefono || "";
+  panel.innerHTML = `
+    <h3>Mi perfil: ${escaparHTML(usuarioActual)}</h3>
+    <div>
+      ${
+        perfil.foto
+          ? `<img src="${escaparHTML(perfil.foto)}" alt="Foto de perfil"
+              style="width:70px;height:70px;object-fit:cover;border-radius:50%">`
+          : ""
+      }
+    </div>
+    <label>Mi número de WhatsApp</label>
+    <input id="telefonoPerfil" type="tel" placeholder="Ej. 593999999999"
+      value="${escaparHTML(perfil.telefono || "")}">
+    <button id="btnGuardarTelefono" type="button">Guardar WhatsApp</button>
+    <p id="estadoTelefono"></p>
+    <label>Foto de perfil</label>
+    <input id="fotoPerfil" type="file" accept="image/*">
+    <button id="btnGuardarPerfil" type="button">Guardar foto</button>
+    <p id="estadoPerfil"></p>
+  `;
+
+  $("btnGuardarTelefono").onclick = guardarTelefono;
+  $("btnGuardarPerfil").onclick = guardarFotoPerfil;
+}
+
+/* GUARDAR TELEFONO */
+async function guardarTelefono() {
+  const telefono = $("telefonoPerfil").value.trim();
+  const estado = $("estadoTelefono");
+
+  if (!telefono) {
+    estado.textContent = "Escribe tu número de WhatsApp.";
+    return;
+  }
+
+  try {
+    estado.textContent = "Guardando...";
+
+    await conTiempoLimite(
+      setDoc(
+        doc(db, "perfiles", usuarioActual),
+        { telefono, usuario: usuarioActual },
+        { merge: true }
+      ),
+      30,
+      "El guardado del número"
+    );
+
+    estado.textContent = "WhatsApp guardado.";
+  } catch (error) {
+    estado.textContent = "Error: " + error.message;
   }
 }
 
-// GUARDAR NÚMERO DE WHATSAPP
-$("btnGuardarTelefono").addEventListener("click", async () => {
-  if (!usuarioActual) return;
-
-  const campo = $("telefonoPerfil");
-  const telefono = campo.value.trim();
-  const numero = telefono.replace(/\D/g, "");
-
-  if (!numero || numero.length < 9 || numero.length > 15) {
-    mostrarEstado(
-      "Escribe un número válido con código de país si corresponde.",
-      "estadoTelefono"
-    );
-    return;
-  }
-
-  const boton = $("btnGuardarTelefono");
-  boton.disabled = true;
-
-  mostrarEstado("Guardando número...", "estadoTelefono");
-
-  try {
-    await setDoc(
-      doc(db, "perfiles", usuarioActual),
-      {
-        usuario: usuarioActual,
-        telefono: numero,
-        actualizado: serverTimestamp()
-      },
-      { merge: true }
-    );
-
-    mostrarEstado(
-      "Número de WhatsApp guardado correctamente.",
-      "estadoTelefono"
-    );
-  } catch (error) {
-    console.error("Error al guardar WhatsApp:", error);
-
-    mostrarEstado(
-      "No se pudo guardar el número. Revisa las reglas de Firebase.",
-      "estadoTelefono"
-    );
-  } finally {
-    boton.disabled = false;
-  }
-});
-
-// GUARDAR FOTO DEL PERFIL
-$("btnGuardarPerfil").addEventListener("click", async () => {
-  if (!usuarioActual) return;
-
+/* GUARDAR FOTO DE PERFIL */
+async function guardarFotoPerfil() {
   const archivo = $("fotoPerfil").files[0];
+  const estado = $("estadoPerfil");
+  const boton = $("btnGuardarPerfil");
 
   if (!archivo) {
-    mostrarEstado("Selecciona una foto primero.", "estadoPerfil");
+    estado.textContent = "Selecciona una foto.";
     return;
   }
 
-  const boton = $("btnGuardarPerfil");
   boton.disabled = true;
 
-  mostrarEstado("Subiendo foto...", "estadoPerfil");
-
   try {
-    const foto = await subirFoto(archivo, "perfiles");
+    const foto = await subirFoto(archivo, "perfiles", (texto) => {
+      estado.textContent = texto;
+    });
 
-    await setDoc(
-      doc(db, "perfiles", usuarioActual),
-      {
-        usuario: usuarioActual,
-        foto,
-        actualizado: serverTimestamp()
-      },
-      { merge: true }
+    await conTiempoLimite(
+      setDoc(
+        doc(db, "perfiles", usuarioActual),
+        { foto, usuario: usuarioActual },
+        { merge: true }
+      ),
+      30,
+      "El guardado del perfil en Firebase"
     );
 
-    $("fotoPerfil").value = "";
-    mostrarEstado("Foto de perfil guardada.", "estadoPerfil");
+    estado.textContent = "Foto de perfil guardada.";
   } catch (error) {
-    console.error("Error al guardar perfil:", error);
-
-    mostrarEstado(
-      "No se pudo guardar la foto: " + error.message,
-      "estadoPerfil"
-    );
+    estado.textContent = "Error: " + error.message;
   } finally {
     boton.disabled = false;
   }
-});
+}
 
-// CARGAR PERFILES
+/* CARGAR PERFILES */
 onSnapshot(
   collection(db, "perfiles"),
-  (resultado) => {
+  (snapshot) => {
     perfiles = {};
 
-    resultado.docs.forEach((documento) => {
+    snapshot.forEach((documento) => {
       perfiles[documento.id] = documento.data();
     });
 
-    mostrarPerfil();
+    if (usuarioActual) mostrarPerfil();
     mostrarProductos();
   },
   (error) => {
-    console.error("Error al cargar perfiles:", error);
-
-    mostrarEstado(
-      "No se pudieron cargar los perfiles. Revisa Firebase."
-    );
+    console.error("Error cargando perfiles:", error);
   }
 );
 
-// PUBLICAR PRODUCTOS Y SERVICIOS
+/* PUBLICAR PRODUCTOS Y SERVICIOS */
 $("formProducto").addEventListener("submit", async (evento) => {
   evento.preventDefault();
 
@@ -361,66 +359,69 @@ $("formProducto").addEventListener("submit", async (evento) => {
   }
 
   const nombre = $("nombre").value.trim();
-  const precio = Number($("precio").value);
+  const precio = $("precio").value.trim();
   const descripcion = $("descripcion").value.trim();
-  const archivo = $("imagen").files[0];
   const categoria = $("categoria").value;
-
-  if (
-    !nombre ||
-    !descripcion ||
-    !Number.isFinite(precio) ||
-    precio < 0
-  ) {
-    mostrarEstado("Revisa los datos del producto.");
-    return;
-  }
-
-  if (!archivo) {
-    mostrarEstado("Selecciona una foto del producto.");
-    return;
-  }
-
+  const archivo = $("imagen").files[0];
   const boton = $("btnPublicar");
+
+  if (!nombre || !precio || !descripcion || !archivo) {
+    mostrarEstado("Completa todos los campos y selecciona una foto.");
+    return;
+  }
+
+  if (!Number.isFinite(Number(precio)) || Number(precio) < 0) {
+    mostrarEstado("Escribe un precio válido.");
+    return;
+  }
+
   boton.disabled = true;
 
-  mostrarEstado("Subiendo foto y publicando...");
-
   try {
-    const imagen = await subirFoto(archivo, "productos");
+    const imagen = await subirFoto(
+      archivo,
+      "productos",
+      (texto) => mostrarEstado(texto)
+    );
 
-    await addDoc(collection(db, "productos"), {
-      nombre,
-      precio,
-      descripcion,
-      imagen,
-      categoria,
-      vendedor: usuarioActual,
-      creado: serverTimestamp()
-    });
+    mostrarEstado("3/3: Guardando producto en Firebase...");
+
+    await conTiempoLimite(
+      addDoc(collection(db, "productos"), {
+        nombre,
+        precio,
+        descripcion,
+        imagen,
+        categoria,
+        vendedor: usuarioActual,
+        creado: serverTimestamp()
+      }),
+      30,
+      "El guardado del producto en Firebase"
+    );
 
     $("formProducto").reset();
-
-    mostrarEstado("¡Publicación guardada correctamente!");
+    mostrarEstado("¡Producto publicado correctamente!");
   } catch (error) {
-    console.error("Error al publicar:", error);
-
-    mostrarEstado(
-      "No se pudo publicar: " + error.message
-    );
+    console.error("Error publicando:", error);
+    mostrarEstado("No se pudo publicar: " + error.message);
   } finally {
     boton.disabled = false;
   }
 });
 
-// CARGAR PUBLICACIONES
+/* CARGAR PUBLICACIONES */
 onSnapshot(
   collection(db, "productos"),
-  (resultado) => {
-    productos = resultado.docs.map((documento) => ({
-      id: documento.id,
-      ...documento.data()
-    }));
+  (snapshot) => {
+    productos = [];
+
+    snapshot.forEach((documento) => {
+      productos.push({
+        id: documento.id,
+        ...documento.data()
+      });
+    });
 
     productos.sort((a, b) => {
       const fechaA = a.creado?.toMillis?.() || 0;
@@ -429,227 +430,183 @@ onSnapshot(
     });
 
     mostrarProductos();
-    mostrarEstado("");
   },
   (error) => {
-    console.error("Error al cargar productos:", error);
-
-    mostrarEstado(
-      "No se pudieron cargar los productos. Revisa Firestore."
-    );
+    console.error("Error cargando productos:", error);
+    mostrarEstado("Error al cargar publicaciones: " + error.message);
   }
 );
 
-// PREPARAR NÚMERO PARA WHATSAPP
-function prepararNumeroWhatsApp(telefono) {
-  let numero = String(telefono || "").replace(/\D/g, "");
-
-  // Número ecuatoriano escrito como 09XXXXXXXX
-  if (numero.startsWith("0")) {
-    numero = "593" + numero.slice(1);
-  } else if (numero.length === 9 && numero.startsWith("9")) {
-    // Número ecuatoriano escrito sin el cero inicial
-    numero = "593" + numero;
-  }
-
-  return numero;
+/* FILTRAR */
+if ($("filtro")) {
+  $("filtro").addEventListener("change", (evento) => {
+    filtroActual = evento.target.value;
+    mostrarProductos();
+  });
 }
 
-// MOSTRAR PUBLICACIONES, CONTACTAR Y ELIMINAR
+/* MOSTRAR PRODUCTOS */
 function mostrarProductos() {
   const lista = $("lista");
   if (!lista) return;
 
-  lista.replaceChildren();
+  const filtrados = productos.filter((producto) => {
+    return filtroActual === "Todos" ||
+      producto.categoria === filtroActual;
+  });
 
-  const encontrados = productos.filter(
-    (producto) =>
-      filtroActual === "Todos" ||
-      producto.categoria === filtroActual
-  );
+  lista.innerHTML = "";
 
-  if (encontrados.length === 0) {
-    const mensaje = document.createElement("p");
-    mensaje.textContent =
-      "Todavía no hay publicaciones en esta categoría.";
-    lista.appendChild(mensaje);
+  if (filtrados.length === 0) {
+    lista.innerHTML = "<p>No hay publicaciones todavía.</p>";
     return;
   }
 
-  encontrados.forEach((producto) => {
+  filtrados.forEach((producto) => {
     const tarjeta = document.createElement("article");
-    tarjeta.className = "producto";
-    tarjeta.style.cssText =
-      "max-width:500px;margin:20px auto;background:white;border:1px solid #ddd;border-radius:12px;overflow:hidden;color:#222;";
+    tarjeta.className = "tarjeta-producto";
 
-    const encabezado = document.createElement("div");
-    encabezado.style.cssText =
-      "display:flex;align-items:center;gap:10px;padding:12px;";
+    const perfil = perfiles[producto.vendedor] || {};
 
-    const perfil = perfiles[producto.vendedor];
+    const foto = document.createElement("img");
+    foto.src = producto.imagen || "";
+    foto.alt = producto.nombre || "Producto";
+    foto.style.maxWidth = "100%";
+    foto.style.maxHeight = "250px";
+    foto.style.objectFit = "contain";
 
-    if (perfil?.foto) {
-      const avatar = document.createElement("img");
-      avatar.src = perfil.foto;
-      avatar.alt = "Foto de perfil";
-      avatar.style.cssText =
-        "width:42px;height:42px;border-radius:50%;object-fit:cover;";
-      encabezado.appendChild(avatar);
-    }
+    foto.onerror = () => {
+      foto.alt = "No se pudo cargar la imagen";
+    };
 
-    const vendedor = document.createElement("strong");
-    vendedor.textContent = producto.vendedor || "Usuario";
-    encabezado.appendChild(vendedor);
-    tarjeta.appendChild(encabezado);
+    const titulo = document.createElement("h3");
+    titulo.textContent = producto.nombre || "";
 
-    if (producto.imagen) {
-      const foto = document.createElement("img");
-      foto.src = producto.imagen;
-      foto.alt = producto.nombre || "Foto del producto";
-      foto.loading = "lazy";
-      foto.style.cssText =
-        "display:block;width:100%;max-height:500px;object-fit:contain;background:#f5f5f5;";
-      tarjeta.appendChild(foto);
-    }
-
-    const contenido = document.createElement("div");
-    contenido.style.cssText = "padding:14px;";
-
-    const precio = document.createElement("h3");
-    precio.className = "precio";
-    precio.textContent =
-      `$${Number(producto.precio || 0).toFixed(2)}`;
-    contenido.appendChild(precio);
-
-    const nombre = document.createElement("strong");
-    nombre.textContent = producto.nombre || "Producto";
-    contenido.appendChild(nombre);
+    const precio = document.createElement("p");
+    precio.textContent = "$" + (producto.precio ?? "");
 
     const descripcion = document.createElement("p");
     descripcion.textContent = producto.descripcion || "";
-    contenido.appendChild(descripcion);
 
-    const categoria = document.createElement("span");
-    categoria.className = "categoria";
-    categoria.textContent = producto.categoria || "Productos";
-    contenido.appendChild(categoria);
+    const categoria = document.createElement("p");
+    categoria.textContent = "Categoría: " + (producto.categoria || "");
 
-    tarjeta.appendChild(contenido);
+    const vendedor = document.createElement("p");
+    vendedor.textContent = "Vendedor: " + (producto.vendedor || "");
 
-    // BOTÓN CONTACTAR POR WHATSAPP
-    if (
-      producto.vendedor &&
-      producto.vendedor !== usuarioActual
-    ) {
-      const botonContactar = document.createElement("button");
-      botonContactar.type = "button";
-      botonContactar.textContent = "💬 Contactar";
-      botonContactar.setAttribute(
-        "aria-label",
-        `Contactar al vendedor sobre ${producto.nombre || "esta publicación"}`
-      );
+    tarjeta.append(
+      foto,
+      titulo,
+      precio,
+      descripcion,
+      categoria,
+      vendedor
+    );
 
-      botonContactar.style.cssText =
-        "display:block;margin:0 14px 14px;padding:10px 16px;background:#25D366;color:white;border:0;border-radius:8px;cursor:pointer;font-size:15px;";
-
-      botonContactar.addEventListener("click", () => {
-        const telefono = perfiles[producto.vendedor]?.telefono;
-
-        if (!telefono) {
-          alert(
-            "Este vendedor todavía no ha registrado su número de WhatsApp."
-          );
-          return;
-        }
-
-        const numero = prepararNumeroWhatsApp(telefono);
-
-        if (numero.length < 10 || numero.length > 15) {
-          alert(
-            "El número de WhatsApp del vendedor no parece válido."
-          );
-          return;
-        }
-
-        const mensaje =
-          producto.categoria === "Servicios"
-            ? `Hola, me interesa tu servicio: ${producto.nombre}. ¿Me das más información?`
-            : `Hola, me interesa tu producto: ${producto.nombre}. ¿Está disponible?`;
-
-        const enlace =
-          `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
-
-        window.open(enlace, "_blank", "noopener,noreferrer");
-      });
-
-      tarjeta.appendChild(botonContactar);
+    if (perfil.foto) {
+      const fotoVendedor = document.createElement("img");
+      fotoVendedor.src = perfil.foto;
+      fotoVendedor.alt = "Foto del vendedor";
+      fotoVendedor.style.width = "40px";
+      fotoVendedor.style.height = "40px";
+      fotoVendedor.style.objectFit = "cover";
+      fotoVendedor.style.borderRadius = "50%";
+      tarjeta.appendChild(fotoVendedor);
     }
 
-    // BOTÓN PARA ELIMINAR LAS PROPIAS PUBLICACIONES
     if (
-      usuarioActual &&
-      producto.vendedor === usuarioActual
+      producto.vendedor !== usuarioActual &&
+      perfil.telefono
     ) {
-      const botonEliminar = document.createElement("button");
-      botonEliminar.type = "button";
-      botonEliminar.textContent = "🗑️ Eliminar publicación";
-      botonEliminar.style.cssText =
-        "display:block;margin:0 14px 14px;padding:10px 14px;background:#dc2626;color:white;border:0;border-radius:6px;cursor:pointer;";
+      const contacto = document.createElement("a");
+      const numero = perfil.telefono.replace(/\D/g, "");
+      contacto.href =
+        "https://wa.me/" + numero;
+      contacto.target = "_blank";
+      contacto.rel = "noopener noreferrer";
+      contacto.textContent = "Contactar por WhatsApp";
+      tarjeta.appendChild(contacto);
+    }
 
-      botonEliminar.addEventListener("click", async () => {
-        const confirmar = confirm(
-          `¿Seguro que quieres eliminar "${producto.nombre}"? Esta acción no se puede deshacer.`
-        );
+    if (producto.vendedor === usuarioActual) {
+      const eliminar = document.createElement("button");
+      eliminar.type = "button";
+      eliminar.textContent = "Eliminar publicación";
 
-        if (!confirmar) return;
+      eliminar.onclick = async () => {
+        if (!confirm("¿Seguro que quieres eliminar esta publicación?")) {
+          return;
+        }
 
-        botonEliminar.disabled = true;
-        botonEliminar.textContent = "Eliminando...";
+        eliminar.disabled = true;
 
         try {
-          await deleteDoc(doc(db, "productos", producto.id));
-
-          mostrarEstado("Publicación eliminada correctamente.");
-        } catch (error) {
-          console.error("Error al eliminar:", error);
-
-          mostrarEstado(
-            "No se pudo eliminar. Revisa los permisos de Firebase."
+          await conTiempoLimite(
+            deleteDoc(doc(db, "productos", producto.id)),
+            30,
+            "La eliminación del producto"
           );
-
-          botonEliminar.disabled = false;
-          botonEliminar.textContent = "🗑️ Eliminar publicación";
+        } catch (error) {
+          alert("No se pudo eliminar: " + error.message);
+          eliminar.disabled = false;
         }
-      });
+      };
 
-      tarjeta.appendChild(botonEliminar);
+      tarjeta.appendChild(eliminar);
     }
 
     lista.appendChild(tarjeta);
   });
 }
 
-// FILTRAR CATEGORÍAS
-$("filtro").addEventListener("change", (evento) => {
-  filtroActual = evento.target.value;
-  mostrarProductos();
-});
+/* CHAT */
+if ($("formChat")) {
+  $("formChat").addEventListener("submit", (evento) => {
+    evento.preventDefault();
 
-// CHAT LOCAL: SOLO FUNCIONA EN ESTE NAVEGADOR
-$("formChat").addEventListener("submit", (evento) => {
-  evento.preventDefault();
+    const entrada = $("mensaje");
+    const mensajes = $("mensajes");
 
-  const campo = $("mensaje");
-  const texto = campo.value.trim();
+    const texto = entrada.value.trim();
 
-  if (!texto || !usuarioActual) return;
+    if (!texto || !usuarioActual) return;
 
-  const mensaje = document.createElement("p");
-  mensaje.textContent = `${usuarioActual}: ${texto}`;
-  $("mensajes").appendChild(mensaje);
+    const mensaje = document.createElement("p");
+    mensaje.textContent = usuarioActual + ": " + texto;
 
-  campo.value = "";
-});
+    mensajes.appendChild(mensaje);
+    entrada.value = "";
+  });
+}
 
+/* SEGURIDAD PARA TEXTO HTML */
+function escaparHTML(texto) {
+  return String(texto ?? "").replace(/[&<>"']/g, (caracter) => {
+    const equivalencias = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    };
+
+    return equivalencias[caracter];
+  });
+}
+
+/* BOTONES DE ACCESO */
+if ($("btnRegistrar")) {
+  $("btnRegistrar").addEventListener("click", registrar);
+}
+
+if ($("btnIngresar")) {
+  $("btnIngresar").addEventListener("click", iniciarSesion);
+}
+
+if ($("btnCerrarSesion")) {
+  $("btnCerrarSesion").addEventListener("click", cerrarSesion);
+}
+
+/* INICIAR */
 actualizarPantalla();
 mostrarProductos();
