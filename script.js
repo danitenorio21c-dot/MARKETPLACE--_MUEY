@@ -1,6 +1,7 @@
 
 
 
+
 import { db } from "./firebase.js";
 
 import {
@@ -11,6 +12,15 @@ import {
   doc,
   setDoc
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// CONEXIÓN CON SUPABASE
+const SUPABASE_URL = "https://pkbcoyelqegbxbrxefbk.supabase.co";
+const SUPABASE_KEY = "sb_publishable_kk9cmEuMm3RdJ11P7stVlA_WYQytzeX";
+const SUPABASE_BUCKET = "FOTOS MUEY";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = (id) => document.getElementById(id);
 
@@ -42,7 +52,9 @@ function registrar() {
     return;
   }
 
-  const cuentas = JSON.parse(localStorage.getItem("cuentasMuey") || "{}");
+  const cuentas = JSON.parse(
+    localStorage.getItem("cuentasMuey") || "{}"
+  );
 
   if (cuentas[usuario]) {
     mostrarEstado("Ese usuario ya existe.", "mensajeLogin");
@@ -61,7 +73,9 @@ function registrar() {
 function iniciarSesion() {
   const usuario = $("usuario").value.trim();
   const clave = $("clave").value;
-  const cuentas = JSON.parse(localStorage.getItem("cuentasMuey") || "{}");
+  const cuentas = JSON.parse(
+    localStorage.getItem("cuentasMuey") || "{}"
+  );
 
   if (cuentas[usuario] && cuentas[usuario] === clave) {
     usuarioActual = usuario;
@@ -69,7 +83,10 @@ function iniciarSesion() {
     actualizarPantalla();
     mostrarEstado("Sesión iniciada.", "mensajeLogin");
   } else {
-    mostrarEstado("Datos incorrectos o cuenta no registrada.", "mensajeLogin");
+    mostrarEstado(
+      "Datos incorrectos o cuenta no registrada.",
+      "mensajeLogin"
+    );
   }
 }
 
@@ -83,39 +100,62 @@ $("btnRegistrar").addEventListener("click", registrar);
 $("btnIngresar").addEventListener("click", iniciarSesion);
 $("btnCerrarSesion").addEventListener("click", cerrarSesion);
 
-// Comprimir las fotos para intentar guardarlas en Firestore
+// COMPRIMIR LA FOTO
 function comprimirFoto(archivo) {
   return new Promise((resolve, reject) => {
     if (!archivo || !archivo.type.startsWith("image/")) {
-      reject(new Error("Selecciona un archivo de imagen válido."));
+      reject(new Error("Selecciona una imagen válida."));
       return;
     }
 
     const lector = new FileReader();
 
-    lector.onerror = () => reject(new Error("No se pudo leer la foto."));
+    lector.onerror = () =>
+      reject(new Error("No se pudo leer la foto."));
 
     lector.onload = () => {
       const imagen = new Image();
 
-      imagen.onerror = () => reject(new Error("La imagen no es válida."));
+      imagen.onerror = () =>
+        reject(new Error("La imagen no es válida."));
 
       imagen.onload = () => {
-        const maximo = 400;
+        const maximo = 1000;
         const escala = Math.min(
           1,
           maximo / Math.max(imagen.width, imagen.height)
         );
 
         const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(imagen.width * escala));
-        canvas.height = Math.max(1, Math.round(imagen.height * escala));
+        canvas.width = Math.max(
+          1,
+          Math.round(imagen.width * escala)
+        );
+        canvas.height = Math.max(
+          1,
+          Math.round(imagen.height * escala)
+        );
 
         const contexto = canvas.getContext("2d");
-        contexto.drawImage(imagen, 0, 0, canvas.width, canvas.height);
+        contexto.drawImage(
+          imagen,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
 
-        // JPEG reduce el tamaño; calidad baja para respetar límites.
-        resolve(canvas.toDataURL("image/jpeg", 0.45));
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error("No se pudo comprimir la foto."));
+            }
+          },
+          "image/jpeg",
+          0.75
+        );
       };
 
       imagen.src = lector.result;
@@ -125,7 +165,33 @@ function comprimirFoto(archivo) {
   });
 }
 
-// Panel del perfil
+// SUBIR LA FOTO A SUPABASE Y OBTENER SU ENLACE
+async function subirFoto(archivo, carpeta) {
+  const imagen = await comprimirFoto(archivo);
+
+  const ruta =
+    `${carpeta}/${Date.now()}-` +
+    `${Math.random().toString(36).slice(2)}.jpg`;
+
+  const { error } = await supabase.storage
+    .from(SUPABASE_BUCKET)
+    .upload(ruta, imagen, {
+      contentType: "image/jpeg",
+      upsert: false
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  const { data } = supabase.storage
+    .from(SUPABASE_BUCKET)
+    .getPublicUrl(ruta);
+
+  return data.publicUrl;
+}
+
+// PANEL DEL PERFIL
 const panelPerfil = document.createElement("section");
 panelPerfil.className = "panel-perfil";
 panelPerfil.style.cssText =
@@ -160,6 +226,7 @@ function mostrarPerfil() {
   }
 }
 
+// GUARDAR FOTO DEL PERFIL
 $("btnGuardarPerfil").addEventListener("click", async () => {
   if (!usuarioActual) return;
 
@@ -172,23 +239,28 @@ $("btnGuardarPerfil").addEventListener("click", async () => {
 
   const boton = $("btnGuardarPerfil");
   boton.disabled = true;
-  mostrarEstado("Comprimiendo y guardando foto...", "estadoPerfil");
+
+  mostrarEstado("Subiendo foto...", "estadoPerfil");
 
   try {
-    const foto = await comprimirFoto(archivo);
+    const foto = await subirFoto(archivo, "perfiles");
 
-    await setDoc(doc(db, "perfiles", usuarioActual), {
-      usuario: usuarioActual,
-      foto,
-      actualizado: serverTimestamp()
-    }, { merge: true });
+    await setDoc(
+      doc(db, "perfiles", usuarioActual),
+      {
+        usuario: usuarioActual,
+        foto,
+        actualizado: serverTimestamp()
+      },
+      { merge: true }
+    );
 
     $("fotoPerfil").value = "";
     mostrarEstado("Foto de perfil guardada.", "estadoPerfil");
   } catch (error) {
-    console.error(error);
+    console.error("Error al guardar perfil:", error);
     mostrarEstado(
-      "No se pudo guardar. La foto puede superar el límite de Firestore.",
+      "No se pudo guardar la foto: " + error.message,
       "estadoPerfil"
     );
   } finally {
@@ -196,22 +268,26 @@ $("btnGuardarPerfil").addEventListener("click", async () => {
   }
 });
 
-// Cargar perfiles de los vendedores
-onSnapshot(collection(db, "perfiles"), (resultado) => {
-  perfiles = {};
+// CARGAR PERFILES
+onSnapshot(
+  collection(db, "perfiles"),
+  (resultado) => {
+    perfiles = {};
 
-  resultado.docs.forEach((documento) => {
-    perfiles[documento.id] = documento.data();
-  });
+    resultado.docs.forEach((documento) => {
+      perfiles[documento.id] = documento.data();
+    });
 
-  mostrarPerfil();
-  mostrarProductos();
-}, (error) => {
-  console.error(error);
-  mostrarEstado("No se pudieron cargar los perfiles.");
-});
+    mostrarPerfil();
+    mostrarProductos();
+  },
+  (error) => {
+    console.error("Error al cargar perfiles:", error);
+    mostrarEstado("No se pudieron cargar los perfiles.");
+  }
+);
 
-// Publicar productos
+// PUBLICAR PRODUCTOS Y SERVICIOS
 $("formProducto").addEventListener("submit", async (evento) => {
   evento.preventDefault();
 
@@ -226,7 +302,12 @@ $("formProducto").addEventListener("submit", async (evento) => {
   const archivo = $("imagen").files[0];
   const categoria = $("categoria").value;
 
-  if (!nombre || !descripcion || !Number.isFinite(precio) || precio < 0) {
+  if (
+    !nombre ||
+    !descripcion ||
+    !Number.isFinite(precio) ||
+    precio < 0
+  ) {
     mostrarEstado("Revisa los datos del producto.");
     return;
   }
@@ -238,11 +319,14 @@ $("formProducto").addEventListener("submit", async (evento) => {
 
   const boton = $("btnPublicar");
   boton.disabled = true;
-  mostrarEstado("Comprimiendo foto y publicando producto...");
+
+  mostrarEstado("Subiendo foto y publicando...");
 
   try {
-    const imagen = await comprimirFoto(archivo);
+    // La foto se guarda en Supabase, no dentro de Firestore.
+    const imagen = await subirFoto(archivo, "productos");
 
+    // Firebase guarda los datos y el enlace de la foto.
     await addDoc(collection(db, "productos"), {
       nombre,
       precio,
@@ -254,50 +338,60 @@ $("formProducto").addEventListener("submit", async (evento) => {
     });
 
     $("formProducto").reset();
-    mostrarEstado("¡Producto publicado correctamente!");
+    mostrarEstado("¡Publicación guardada correctamente!");
   } catch (error) {
-    console.error(error);
+    console.error("Error al publicar:", error);
     mostrarEstado(
-      "No se pudo publicar. Revisa las reglas y el límite de Firestore."
+      "No se pudo publicar: " + error.message
     );
   } finally {
     boton.disabled = false;
   }
 });
 
-// Mostrar publicaciones nuevas primero
-onSnapshot(collection(db, "productos"), (resultado) => {
-  productos = resultado.docs.map((documento) => ({
-    id: documento.id,
-    ...documento.data()
-  }));
+// CARGAR PUBLICACIONES
+onSnapshot(
+  collection(db, "productos"),
+  (resultado) => {
+    productos = resultado.docs.map((documento) => ({
+      id: documento.id,
+      ...documento.data()
+    }));
 
-  productos.sort((a, b) => {
-    const fechaA = a.creado?.toMillis?.() || 0;
-    const fechaB = b.creado?.toMillis?.() || 0;
-    return fechaB - fechaA;
-  });
+    productos.sort((a, b) => {
+      const fechaA = a.creado?.toMillis?.() || 0;
+      const fechaB = b.creado?.toMillis?.() || 0;
+      return fechaB - fechaA;
+    });
 
-  mostrarProductos();
-  mostrarEstado("");
-}, (error) => {
-  console.error(error);
-  mostrarEstado("No se pudieron cargar los productos. Revisa Firestore.");
-});
+    mostrarProductos();
+    mostrarEstado("");
+  },
+  (error) => {
+    console.error("Error al cargar productos:", error);
+    mostrarEstado(
+      "No se pudieron cargar los productos. Revisa Firestore."
+    );
+  }
+);
 
+// MOSTRAR PUBLICACIONES
 function mostrarProductos() {
   const lista = $("lista");
   if (!lista) return;
 
   lista.replaceChildren();
 
-  const encontrados = productos.filter((producto) =>
-    filtroActual === "Todos" || producto.categoria === filtroActual
+  const encontrados = productos.filter(
+    (producto) =>
+      filtroActual === "Todos" ||
+      producto.categoria === filtroActual
   );
 
   if (encontrados.length === 0) {
     const mensaje = document.createElement("p");
-    mensaje.textContent = "Todavía no hay publicaciones en esta categoría.";
+    mensaje.textContent =
+      "Todavía no hay publicaciones en esta categoría.";
     lista.appendChild(mensaje);
     return;
   }
@@ -343,7 +437,8 @@ function mostrarProductos() {
 
     const precio = document.createElement("h3");
     precio.className = "precio";
-    precio.textContent = `$${Number(producto.precio || 0).toFixed(2)}`;
+    precio.textContent =
+      `$${Number(producto.precio || 0).toFixed(2)}`;
     contenido.appendChild(precio);
 
     const nombre = document.createElement("strong");
@@ -364,12 +459,13 @@ function mostrarProductos() {
   });
 }
 
+// FILTRAR CATEGORÍAS
 $("filtro").addEventListener("change", (evento) => {
   filtroActual = evento.target.value;
   mostrarProductos();
 });
 
-// Chat: por ahora solo aparece en este navegador.
+// CHAT: SIGUE FUNCIONANDO SOLO EN ESTE NAVEGADOR
 $("formChat").addEventListener("submit", (evento) => {
   evento.preventDefault();
 
