@@ -3,6 +3,7 @@
 
 
 
+
 import { db } from "./firebase.js";
 
 import {
@@ -162,7 +163,7 @@ function comprimirFoto(archivo) {
         );
       };
 
-      imagen.src = lector.result;
+      lector.src = lector.result;
     };
 
     lector.readAsDataURL(archivo);
@@ -193,7 +194,7 @@ async function subirFoto(archivo, carpeta) {
   return data.publicUrl;
 }
 
-// PANEL DEL PERFIL
+// PANEL DEL PERFIL Y FOTO
 const panelPerfil = document.createElement("section");
 panelPerfil.className = "panel-perfil";
 panelPerfil.style.cssText =
@@ -226,7 +227,66 @@ function mostrarPerfil() {
     foto.removeAttribute("src");
     foto.style.display = "none";
   }
+
+  // Cargar el WhatsApp guardado del vendedor
+  const campoTelefono = $("telefonoPerfil");
+
+  if (
+    campoTelefono &&
+    document.activeElement !== campoTelefono
+  ) {
+    campoTelefono.value =
+      perfiles[usuarioActual]?.telefono || "";
+  }
 }
+
+// GUARDAR NÚMERO DE WHATSAPP
+$("btnGuardarTelefono").addEventListener("click", async () => {
+  if (!usuarioActual) return;
+
+  const campo = $("telefonoPerfil");
+  const telefono = campo.value.trim();
+  const numero = telefono.replace(/\D/g, "");
+
+  if (!numero || numero.length < 9 || numero.length > 15) {
+    mostrarEstado(
+      "Escribe un número válido con código de país si corresponde.",
+      "estadoTelefono"
+    );
+    return;
+  }
+
+  const boton = $("btnGuardarTelefono");
+  boton.disabled = true;
+
+  mostrarEstado("Guardando número...", "estadoTelefono");
+
+  try {
+    await setDoc(
+      doc(db, "perfiles", usuarioActual),
+      {
+        usuario: usuarioActual,
+        telefono: numero,
+        actualizado: serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    mostrarEstado(
+      "Número de WhatsApp guardado correctamente.",
+      "estadoTelefono"
+    );
+  } catch (error) {
+    console.error("Error al guardar WhatsApp:", error);
+
+    mostrarEstado(
+      "No se pudo guardar el número. Revisa las reglas de Firebase.",
+      "estadoTelefono"
+    );
+  } finally {
+    boton.disabled = false;
+  }
+});
 
 // GUARDAR FOTO DEL PERFIL
 $("btnGuardarPerfil").addEventListener("click", async () => {
@@ -261,6 +321,7 @@ $("btnGuardarPerfil").addEventListener("click", async () => {
     mostrarEstado("Foto de perfil guardada.", "estadoPerfil");
   } catch (error) {
     console.error("Error al guardar perfil:", error);
+
     mostrarEstado(
       "No se pudo guardar la foto: " + error.message,
       "estadoPerfil"
@@ -285,7 +346,10 @@ onSnapshot(
   },
   (error) => {
     console.error("Error al cargar perfiles:", error);
-    mostrarEstado("No se pudieron cargar los perfiles.");
+
+    mostrarEstado(
+      "No se pudieron cargar los perfiles. Revisa Firebase."
+    );
   }
 );
 
@@ -338,9 +402,11 @@ $("formProducto").addEventListener("submit", async (evento) => {
     });
 
     $("formProducto").reset();
+
     mostrarEstado("¡Publicación guardada correctamente!");
   } catch (error) {
     console.error("Error al publicar:", error);
+
     mostrarEstado(
       "No se pudo publicar: " + error.message
     );
@@ -369,13 +435,29 @@ onSnapshot(
   },
   (error) => {
     console.error("Error al cargar productos:", error);
+
     mostrarEstado(
       "No se pudieron cargar los productos. Revisa Firestore."
     );
   }
 );
 
-// MOSTRAR PUBLICACIONES Y BOTÓN PARA ELIMINAR
+// PREPARAR NÚMERO PARA WHATSAPP
+function prepararNumeroWhatsApp(telefono) {
+  let numero = String(telefono || "").replace(/\D/g, "");
+
+  // Número ecuatoriano escrito como 09XXXXXXXX
+  if (numero.startsWith("0")) {
+    numero = "593" + numero.slice(1);
+  } else if (numero.length === 9 && numero.startsWith("9")) {
+    // Número ecuatoriano escrito sin el cero inicial
+    numero = "593" + numero;
+  }
+
+  return numero;
+}
+
+// MOSTRAR PUBLICACIONES, CONTACTAR Y ELIMINAR
 function mostrarProductos() {
   const lista = $("lista");
   if (!lista) return;
@@ -456,6 +538,55 @@ function mostrarProductos() {
 
     tarjeta.appendChild(contenido);
 
+    // BOTÓN CONTACTAR POR WHATSAPP
+    if (
+      producto.vendedor &&
+      producto.vendedor !== usuarioActual
+    ) {
+      const botonContactar = document.createElement("button");
+      botonContactar.type = "button";
+      botonContactar.textContent = "💬 Contactar";
+      botonContactar.setAttribute(
+        "aria-label",
+        `Contactar al vendedor sobre ${producto.nombre || "esta publicación"}`
+      );
+
+      botonContactar.style.cssText =
+        "display:block;margin:0 14px 14px;padding:10px 16px;background:#25D366;color:white;border:0;border-radius:8px;cursor:pointer;font-size:15px;";
+
+      botonContactar.addEventListener("click", () => {
+        const telefono = perfiles[producto.vendedor]?.telefono;
+
+        if (!telefono) {
+          alert(
+            "Este vendedor todavía no ha registrado su número de WhatsApp."
+          );
+          return;
+        }
+
+        const numero = prepararNumeroWhatsApp(telefono);
+
+        if (numero.length < 10 || numero.length > 15) {
+          alert(
+            "El número de WhatsApp del vendedor no parece válido."
+          );
+          return;
+        }
+
+        const mensaje =
+          producto.categoria === "Servicios"
+            ? `Hola, me interesa tu servicio: ${producto.nombre}. ¿Me das más información?`
+            : `Hola, me interesa tu producto: ${producto.nombre}. ¿Está disponible?`;
+
+        const enlace =
+          `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+
+        window.open(enlace, "_blank", "noopener,noreferrer");
+      });
+
+      tarjeta.appendChild(botonContactar);
+    }
+
     // BOTÓN PARA ELIMINAR LAS PROPIAS PUBLICACIONES
     if (
       usuarioActual &&
@@ -506,7 +637,7 @@ $("filtro").addEventListener("change", (evento) => {
   mostrarProductos();
 });
 
-// CHAT: SOLO FUNCIONA EN ESTE NAVEGADOR
+// CHAT LOCAL: SOLO FUNCIONA EN ESTE NAVEGADOR
 $("formChat").addEventListener("submit", (evento) => {
   evento.preventDefault();
 
