@@ -4,6 +4,7 @@
 
 
 
+```javascript
 import { db } from "./firebase.js";
 
 import {
@@ -34,6 +35,25 @@ let filtroActual = "Todos";
 
 const seccionLogin = $("seccionLogin");
 const plataforma = $("plataforma");
+
+// TIEMPO LÍMITE PARA OPERACIONES
+function conTiempoLimite(promesa, segundos, operacion) {
+  let temporizador;
+
+  const limite = new Promise((_, reject) => {
+    temporizador = setTimeout(() => {
+      reject(
+        new Error(
+          `${operacion} tardó más de ${segundos} segundos. Comprueba tu conexión y vuelve a intentarlo.`
+        )
+      );
+    }, segundos * 1000);
+  });
+
+  return Promise.race([promesa, limite]).finally(() => {
+    clearTimeout(temporizador);
+  });
+}
 
 function mostrarEstado(texto, elemento = "estado") {
   const destino = $(elemento);
@@ -121,7 +141,7 @@ function comprimirFoto(archivo) {
       const imagen = new Image();
 
       imagen.onerror = () =>
-        reject(new Error("La imagen no es válida."));
+        reject(new Error("No se pudo abrir la imagen."));
 
       imagen.onload = () => {
         const maximo = 1000;
@@ -141,6 +161,11 @@ function comprimirFoto(archivo) {
         );
 
         const contexto = canvas.getContext("2d");
+
+        if (!contexto) {
+          reject(new Error("No se pudo procesar la imagen."));
+          return;
+        }
 
         contexto.drawImage(
           imagen,
@@ -163,7 +188,7 @@ function comprimirFoto(archivo) {
         );
       };
 
-      lector.src = lector.result;
+      imagen.src = lector.result;
     };
 
     lector.readAsDataURL(archivo);
@@ -171,25 +196,45 @@ function comprimirFoto(archivo) {
 }
 
 // SUBIR FOTO A SUPABASE
-async function subirFoto(archivo, carpeta) {
-  const imagen = await comprimirFoto(archivo);
+async function subirFoto(archivo, carpeta, informarEstado) {
+  informarEstado("Comprimiendo foto...");
+
+  const imagen = await conTiempoLimite(
+    comprimirFoto(archivo),
+    30,
+    "La compresión de la foto"
+  );
 
   const ruta =
     `${carpeta}/${Date.now()}-` +
     `${Math.random().toString(36).slice(2)}.jpg`;
 
-  const { error } = await supabase.storage
-    .from(SUPABASE_BUCKET)
-    .upload(ruta, imagen, {
-      contentType: "image/jpeg",
-      upsert: false
-    });
+  informarEstado("Subiendo foto a Supabase...");
 
-  if (error) throw error;
+  const resultado = await conTiempoLimite(
+    supabase.storage
+      .from(SUPABASE_BUCKET)
+      .upload(ruta, imagen, {
+        contentType: "image/jpeg",
+        upsert: false
+      }),
+    30,
+    "La subida a Supabase"
+  );
+
+  if (resultado.error) {
+    throw new Error(
+      `Error de Supabase: ${resultado.error.message}`
+    );
+  }
 
   const { data } = supabase.storage
     .from(SUPABASE_BUCKET)
     .getPublicUrl(ruta);
+
+  if (!data?.publicUrl) {
+    throw new Error("Supabase no devolvió la dirección de la foto.");
+  }
 
   return data.publicUrl;
 }
@@ -228,7 +273,6 @@ function mostrarPerfil() {
     foto.style.display = "none";
   }
 
-  // Cargar el WhatsApp guardado del vendedor
   const campoTelefono = $("telefonoPerfil");
 
   if (
@@ -262,14 +306,18 @@ $("btnGuardarTelefono").addEventListener("click", async () => {
   mostrarEstado("Guardando número...", "estadoTelefono");
 
   try {
-    await setDoc(
-      doc(db, "perfiles", usuarioActual),
-      {
-        usuario: usuarioActual,
-        telefono: numero,
-        actualizado: serverTimestamp()
-      },
-      { merge: true }
+    await conTiempoLimite(
+      setDoc(
+        doc(db, "perfiles", usuarioActual),
+        {
+          usuario: usuarioActual,
+          telefono: numero,
+          actualizado: serverTimestamp()
+        },
+        { merge: true }
+      ),
+      30,
+      "El guardado del número"
     );
 
     mostrarEstado(
@@ -280,7 +328,7 @@ $("btnGuardarTelefono").addEventListener("click", async () => {
     console.error("Error al guardar WhatsApp:", error);
 
     mostrarEstado(
-      "No se pudo guardar el número. Revisa las reglas de Firebase.",
+      "No se pudo guardar el número: " + error.message,
       "estadoTelefono"
     );
   } finally {
@@ -302,19 +350,27 @@ $("btnGuardarPerfil").addEventListener("click", async () => {
   const boton = $("btnGuardarPerfil");
   boton.disabled = true;
 
-  mostrarEstado("Subiendo foto...", "estadoPerfil");
-
   try {
-    const foto = await subirFoto(archivo, "perfiles");
+    const foto = await subirFoto(
+      archivo,
+      "perfiles",
+      (texto) => mostrarEstado(texto, "estadoPerfil")
+    );
 
-    await setDoc(
-      doc(db, "perfiles", usuarioActual),
-      {
-        usuario: usuarioActual,
-        foto,
-        actualizado: serverTimestamp()
-      },
-      { merge: true }
+    mostrarEstado("Guardando foto del perfil...", "estadoPerfil");
+
+    await conTiempoLimite(
+      setDoc(
+        doc(db, "perfiles", usuarioActual),
+        {
+          usuario: usuarioActual,
+          foto,
+          actualizado: serverTimestamp()
+        },
+        { merge: true }
+      ),
+      30,
+      "El guardado de la foto del perfil"
     );
 
     $("fotoPerfil").value = "";
@@ -386,29 +442,37 @@ $("formProducto").addEventListener("submit", async (evento) => {
   const boton = $("btnPublicar");
   boton.disabled = true;
 
-  mostrarEstado("Subiendo foto y publicando...");
-
   try {
-    const imagen = await subirFoto(archivo, "productos");
+    const imagen = await subirFoto(
+      archivo,
+      "productos",
+      mostrarEstado
+    );
 
-    await addDoc(collection(db, "productos"), {
-      nombre,
-      precio,
-      descripcion,
-      imagen,
-      categoria,
-      vendedor: usuarioActual,
-      creado: serverTimestamp()
-    });
+    mostrarEstado("Guardando producto en Firebase...");
+
+    await conTiempoLimite(
+      addDoc(collection(db, "productos"), {
+        nombre,
+        precio,
+        descripcion,
+        imagen,
+        categoria,
+        vendedor: usuarioActual,
+        creado: serverTimestamp()
+      }),
+      30,
+      "El guardado del producto en Firebase"
+    );
 
     $("formProducto").reset();
-
     mostrarEstado("¡Publicación guardada correctamente!");
   } catch (error) {
     console.error("Error al publicar:", error);
 
     mostrarEstado(
-      "No se pudo publicar: " + error.message
+      "No se pudo publicar: " +
+      (error.message || "Error desconocido.")
     );
   } finally {
     boton.disabled = false;
@@ -431,7 +495,6 @@ onSnapshot(
     });
 
     mostrarProductos();
-    mostrarEstado("");
   },
   (error) => {
     console.error("Error al cargar productos:", error);
@@ -446,11 +509,9 @@ onSnapshot(
 function prepararNumeroWhatsApp(telefono) {
   let numero = String(telefono || "").replace(/\D/g, "");
 
-  // Número ecuatoriano escrito como 09XXXXXXXX
   if (numero.startsWith("0")) {
     numero = "593" + numero.slice(1);
   } else if (numero.length === 9 && numero.startsWith("9")) {
-    // Número ecuatoriano escrito sin el cero inicial
     numero = "593" + numero;
   }
 
@@ -538,7 +599,7 @@ function mostrarProductos() {
 
     tarjeta.appendChild(contenido);
 
-    // BOTÓN CONTACTAR POR WHATSAPP
+    // CONTACTAR POR WHATSAPP
     if (
       producto.vendedor &&
       producto.vendedor !== usuarioActual
@@ -546,11 +607,6 @@ function mostrarProductos() {
       const botonContactar = document.createElement("button");
       botonContactar.type = "button";
       botonContactar.textContent = "💬 Contactar";
-      botonContactar.setAttribute(
-        "aria-label",
-        `Contactar al vendedor sobre ${producto.nombre || "esta publicación"}`
-      );
-
       botonContactar.style.cssText =
         "display:block;margin:0 14px 14px;padding:10px 16px;background:#25D366;color:white;border:0;border-radius:8px;cursor:pointer;font-size:15px;";
 
@@ -558,18 +614,14 @@ function mostrarProductos() {
         const telefono = perfiles[producto.vendedor]?.telefono;
 
         if (!telefono) {
-          alert(
-            "Este vendedor todavía no ha registrado su número de WhatsApp."
-          );
+          alert("Este vendedor todavía no ha registrado su WhatsApp.");
           return;
         }
 
         const numero = prepararNumeroWhatsApp(telefono);
 
         if (numero.length < 10 || numero.length > 15) {
-          alert(
-            "El número de WhatsApp del vendedor no parece válido."
-          );
+          alert("El número de WhatsApp no parece válido.");
           return;
         }
 
@@ -578,16 +630,17 @@ function mostrarProductos() {
             ? `Hola, me interesa tu servicio: ${producto.nombre}. ¿Me das más información?`
             : `Hola, me interesa tu producto: ${producto.nombre}. ¿Está disponible?`;
 
-        const enlace =
-          `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
-
-        window.open(enlace, "_blank", "noopener,noreferrer");
+        window.open(
+          `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`,
+          "_blank",
+          "noopener,noreferrer"
+        );
       });
 
       tarjeta.appendChild(botonContactar);
     }
 
-    // BOTÓN PARA ELIMINAR LAS PROPIAS PUBLICACIONES
+    // ELIMINAR PUBLICACIONES PROPIAS
     if (
       usuarioActual &&
       producto.vendedor === usuarioActual
@@ -609,14 +662,18 @@ function mostrarProductos() {
         botonEliminar.textContent = "Eliminando...";
 
         try {
-          await deleteDoc(doc(db, "productos", producto.id));
+          await conTiempoLimite(
+            deleteDoc(doc(db, "productos", producto.id)),
+            30,
+            "La eliminación de la publicación"
+          );
 
           mostrarEstado("Publicación eliminada correctamente.");
         } catch (error) {
           console.error("Error al eliminar:", error);
 
           mostrarEstado(
-            "No se pudo eliminar. Revisa los permisos de Firebase."
+            "No se pudo eliminar: " + error.message
           );
 
           botonEliminar.disabled = false;
@@ -655,3 +712,4 @@ $("formChat").addEventListener("submit", (evento) => {
 
 actualizarPantalla();
 mostrarProductos();
+```
