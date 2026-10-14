@@ -2,6 +2,7 @@
 
 
 
+
 import { db } from "./firebase.js";
 
 import {
@@ -10,7 +11,8 @@ import {
   onSnapshot,
   serverTimestamp,
   doc,
-  setDoc
+  setDoc,
+  deleteDoc
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -73,6 +75,7 @@ function registrar() {
 function iniciarSesion() {
   const usuario = $("usuario").value.trim();
   const clave = $("clave").value;
+
   const cuentas = JSON.parse(
     localStorage.getItem("cuentasMuey") || "{}"
   );
@@ -100,7 +103,7 @@ $("btnRegistrar").addEventListener("click", registrar);
 $("btnIngresar").addEventListener("click", iniciarSesion);
 $("btnCerrarSesion").addEventListener("click", cerrarSesion);
 
-// COMPRIMIR LA FOTO
+// COMPRIMIR FOTOS
 function comprimirFoto(archivo) {
   return new Promise((resolve, reject) => {
     if (!archivo || !archivo.type.startsWith("image/")) {
@@ -137,6 +140,7 @@ function comprimirFoto(archivo) {
         );
 
         const contexto = canvas.getContext("2d");
+
         contexto.drawImage(
           imagen,
           0,
@@ -165,7 +169,7 @@ function comprimirFoto(archivo) {
   });
 }
 
-// SUBIR LA FOTO A SUPABASE Y OBTENER SU ENLACE
+// SUBIR FOTO A SUPABASE
 async function subirFoto(archivo, carpeta) {
   const imagen = await comprimirFoto(archivo);
 
@@ -180,9 +184,7 @@ async function subirFoto(archivo, carpeta) {
       upsert: false
     });
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 
   const { data } = supabase.storage
     .from(SUPABASE_BUCKET)
@@ -323,10 +325,8 @@ $("formProducto").addEventListener("submit", async (evento) => {
   mostrarEstado("Subiendo foto y publicando...");
 
   try {
-    // La foto se guarda en Supabase, no dentro de Firestore.
     const imagen = await subirFoto(archivo, "productos");
 
-    // Firebase guarda los datos y el enlace de la foto.
     await addDoc(collection(db, "productos"), {
       nombre,
       precio,
@@ -375,7 +375,7 @@ onSnapshot(
   }
 );
 
-// MOSTRAR PUBLICACIONES
+// MOSTRAR PUBLICACIONES Y BOTÓN PARA ELIMINAR
 function mostrarProductos() {
   const lista = $("lista");
   if (!lista) return;
@@ -455,6 +455,47 @@ function mostrarProductos() {
     contenido.appendChild(categoria);
 
     tarjeta.appendChild(contenido);
+
+    // BOTÓN PARA ELIMINAR LAS PROPIAS PUBLICACIONES
+    if (
+      usuarioActual &&
+      producto.vendedor === usuarioActual
+    ) {
+      const botonEliminar = document.createElement("button");
+      botonEliminar.type = "button";
+      botonEliminar.textContent = "🗑️ Eliminar publicación";
+      botonEliminar.style.cssText =
+        "display:block;margin:0 14px 14px;padding:10px 14px;background:#dc2626;color:white;border:0;border-radius:6px;cursor:pointer;";
+
+      botonEliminar.addEventListener("click", async () => {
+        const confirmar = confirm(
+          `¿Seguro que quieres eliminar "${producto.nombre}"? Esta acción no se puede deshacer.`
+        );
+
+        if (!confirmar) return;
+
+        botonEliminar.disabled = true;
+        botonEliminar.textContent = "Eliminando...";
+
+        try {
+          await deleteDoc(doc(db, "productos", producto.id));
+
+          mostrarEstado("Publicación eliminada correctamente.");
+        } catch (error) {
+          console.error("Error al eliminar:", error);
+
+          mostrarEstado(
+            "No se pudo eliminar. Revisa los permisos de Firebase."
+          );
+
+          botonEliminar.disabled = false;
+          botonEliminar.textContent = "🗑️ Eliminar publicación";
+        }
+      });
+
+      tarjeta.appendChild(botonEliminar);
+    }
+
     lista.appendChild(tarjeta);
   });
 }
@@ -465,7 +506,7 @@ $("filtro").addEventListener("change", (evento) => {
   mostrarProductos();
 });
 
-// CHAT: SIGUE FUNCIONANDO SOLO EN ESTE NAVEGADOR
+// CHAT: SOLO FUNCIONA EN ESTE NAVEGADOR
 $("formChat").addEventListener("submit", (evento) => {
   evento.preventDefault();
 
