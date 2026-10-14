@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -67,6 +68,26 @@
         </button>
       </div>
 
+      <!-- PERFIL DEL VENDEDOR -->
+      <section class="panel">
+        <h2>Mi perfil de vendedor</h2>
+        <p>Registra tu WhatsApp para que los compradores puedan contactarte.</p>
+
+        <label for="telefonoPerfil">Número de WhatsApp</label>
+        <input
+          type="tel"
+          id="telefonoPerfil"
+          placeholder="Ej.: 0991234567"
+          autocomplete="tel"
+        >
+
+        <button type="button" id="btnGuardarTelefono">
+          Guardar número
+        </button>
+
+        <p id="estadoTelefono" role="status"></p>
+      </section>
+
       <section class="panel">
         <h2>Publica tu producto o servicio</h2>
         <p>Comparte lo que vendes con otras personas.</p>
@@ -105,12 +126,13 @@
             accept="image/*"
             required
           >
+
           <img
             id="vistaPrevia"
             alt="Vista previa de la foto"
             hidden
             style="max-width:220px; max-height:220px; object-fit:contain; margin-top:12px; border-radius:12px;"
-          > 
+          >
 
           <label for="categoria">Categoría</label>
           <select id="categoria" required>
@@ -177,3 +199,4 @@
   <script type="module" src="script.js"></script>
 </body>
 </html>
+
