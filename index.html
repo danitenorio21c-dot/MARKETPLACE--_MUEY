@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -31,26 +32,14 @@
       <p>Ingresa o crea tu cuenta para continuar.</p>
 
       <label for="usuario">Nombre de usuario</label>
-      <input
-        type="text"
-        id="usuario"
-        placeholder="Escribe tu usuario"
-        autocomplete="username"
-      >
+      <input type="text" id="usuario" placeholder="Escribe tu usuario" autocomplete="username">
 
       <label for="clave">Contraseña</label>
-      <input
-        type="password"
-        id="clave"
-        placeholder="Escribe tu contraseña"
-        autocomplete="current-password"
-      >
+      <input type="password" id="clave" placeholder="Escribe tu contraseña" autocomplete="current-password">
 
       <div class="botones-login">
         <button id="btnIngresar" type="button">Iniciar sesión</button>
-        <button id="btnRegistrar" type="button" class="boton-secundario">
-          Crear cuenta
-        </button>
+        <button id="btnRegistrar" type="button" class="boton-secundario">Crear cuenta</button>
       </div>
 
       <p id="mensajeLogin" role="status"></p>
@@ -67,29 +56,50 @@
         </button>
       </div>
 
-      <!-- PERFIL DEL VENDEDOR -->
       <section class="panel">
         <h2>Mi perfil de vendedor</h2>
         <p>Registra tu WhatsApp para que los compradores puedan contactarte.</p>
 
         <label for="telefonoPerfil">Número de WhatsApp</label>
-        <input
-          type="tel"
-          id="telefonoPerfil"
-          placeholder="Ej.: 0991234567"
-          autocomplete="tel"
-        >
+        <input type="tel" id="telefonoPerfil" placeholder="Ej.: 0991234567" autocomplete="tel">
 
-        <button type="button" id="btnGuardarTelefono">
-          Guardar número
-        </button>
-
+        <button type="button" id="btnGuardarTelefono">Guardar número</button>
         <p id="estadoTelefono" role="status"></p>
       </section>
 
       <section class="panel">
-        <h2>Publica tu producto o servicio</h2>
-        <p>Comparte lo que vendes con otras personas.</p>
+        <h2>Publicaciones de la comunidad</h2>
+        <p>Descubre lo que otras personas ofrecen.</p>
+
+        <button type="button" id="btnMostrarFormulario">
+          ➕ Agregar publicación
+        </button>
+
+        <div class="titulo-seccion">
+          <label for="filtro">Filtrar:</label>
+          <select id="filtro">
+            <option value="Todos">Todos</option>
+            <option value="Productos">Productos</option>
+            <option value="Servicios">Servicios</option>
+          </select>
+        </div>
+
+        <label for="buscador">Buscar productos o servicios</label>
+        <input
+          type="search"
+          id="buscador"
+          placeholder="Ej.: juguetes, televisores, camisetas, mecánico..."
+          autocomplete="off"
+        >
+
+        <div id="lista" class="lista-productos">
+          <p>Cargando publicaciones...</p>
+        </div>
+      </section>
+
+      <section class="panel" id="panelPublicar" hidden>
+        <h2 id="tituloFormulario">Publica tu producto o servicio</h2>
+        <p>Completa la información de lo que quieres ofrecer.</p>
 
         <form id="formProducto">
           <label for="nombre">Nombre del producto o servicio</label>
@@ -101,30 +111,13 @@
           >
 
           <label for="precio">Precio en dólares ($)</label>
-          <input
-            type="number"
-            id="precio"
-            placeholder="Ej.: 5.00"
-            min="0"
-            step="0.01"
-            required
-          >
+          <input type="number" id="precio" placeholder="Ej.: 5.00" min="0" step="0.01" required>
 
           <label for="descripcion">Descripción</label>
-          <textarea
-            id="descripcion"
-            placeholder="Describe lo que ofreces..."
-            rows="3"
-            required
-          ></textarea>
+          <textarea id="descripcion" placeholder="Describe lo que ofreces..." rows="3" required></textarea>
 
           <label for="imagen">Agregar foto del producto</label>
-          <input
-            type="file"
-            id="imagen"
-            accept="image/*"
-            required
-          >
+          <input type="file" id="imagen" accept="image/*">
 
           <img
             id="vistaPrevia"
@@ -139,45 +132,22 @@
             <option value="Servicios">Servicios</option>
           </select>
 
-          <button type="submit" id="btnPublicar">
-            Publicar ahora
+          <button type="submit" id="btnPublicar">Publicar ahora</button>
+          <button type="button" id="btnCancelarEdicion" class="boton-secundario">
+            Cancelar
           </button>
         </form>
 
         <p id="estado" role="status"></p>
       </section>
-
-      <section class="panel">
-        <div class="titulo-seccion">
-          <div>
-            <h2>Publicaciones de la comunidad</h2>
-            <p>Descubre lo que otras personas ofrecen.</p>
-          </div>
-
-          <label for="filtro">Filtrar:</label>
-          <select id="filtro">
-            <option value="Todos">Todos</option>
-            <option value="Productos">Productos</option>
-            <option value="Servicios">Servicios</option>
-          </select>
-        </div>
-
-        <!-- BUSCADOR DE PRODUCTOS Y SERVICIOS -->
-        <label for="buscador">Buscar productos o servicios</label>
-        <input
-          type="search"
-          id="buscador"
-          placeholder="Ej.: juguetes, televisores, camisetas, mecánico..."
-          autocomplete="off"
-        >
-
-        <div id="lista" class="lista-productos">
-          <p>Cargando publicaciones...</p>
-        </div>
-      </section>
-
     </section>
   </main>
+
+  <section class="panel" style="max-width:1050px;width:94%;margin:30px auto;text-align:center;">
+    <p style="font-size:20px;font-weight:bold;color:#123b65;">
+      «El éxito es la suma de pequeños esfuerzos repetidos día tras día»
+    </p>
+  </section>
 
   <footer class="pie-pagina">
     <p>MARKETPLACE MUEY · Una plataforma para nuestra comunidad</p>
@@ -187,4 +157,3 @@
   <script type="module" src="script.js"></script>
 </body>
 </html>
-
