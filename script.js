@@ -8,7 +8,8 @@ import {
   serverTimestamp,
   doc,
   setDoc,
-  deleteDoc
+  deleteDoc,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -25,9 +26,12 @@ let productos = [];
 let perfiles = {};
 let filtroActual = "Todos";
 let busquedaActual = "";
+let productoEditandoId = null;
+let imagenAnterior = "";
 
 const seccionLogin = $("seccionLogin");
 const plataforma = $("plataforma");
+const panelPublicar = $("panelPublicar");
 
 /* TIEMPO LIMITE PARA EVITAR CARGAS INDEFINIDAS */
 function conTiempoLimite(promesa, segundos, operacion) {
@@ -51,7 +55,7 @@ function mostrarEstado(texto, elemento = "estado") {
   if (destino) destino.textContent = texto || "";
 }
 
-/* INICIO DE SESION Y REGISTRO */
+/* INICIO DE SESIÓN Y REGISTRO */
 function actualizarPantalla() {
   if (seccionLogin) {
     seccionLogin.hidden = Boolean(usuarioActual);
@@ -63,7 +67,7 @@ function actualizarPantalla() {
     plataforma.style.display = usuarioActual ? "block" : "none";
   }
 
-  if (usuarioActual) mostrarPerfil();
+  mostrarPerfil();
 }
 
 function registrar() {
@@ -114,6 +118,7 @@ function iniciarSesion() {
 function cerrarSesion() {
   usuarioActual = "";
   localStorage.removeItem("usuarioActual");
+  cerrarFormulario();
   actualizarPantalla();
 }
 
@@ -127,6 +132,80 @@ if ($("btnIngresar")) {
 
 if ($("btnCerrarSesion")) {
   $("btnCerrarSesion").addEventListener("click", cerrarSesion);
+}
+
+/* FORMULARIO PARA AGREGAR Y EDITAR */
+function abrirFormulario() {
+  if (!panelPublicar) return;
+
+  panelPublicar.hidden = false;
+  panelPublicar.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cerrarFormulario() {
+  if (panelPublicar) panelPublicar.hidden = true;
+
+  if ($("formProducto")) $("formProducto").reset();
+
+  if ($("vistaPrevia")) {
+    $("vistaPrevia").src = "";
+    $("vistaPrevia").hidden = true;
+  }
+
+  productoEditandoId = null;
+  imagenAnterior = "";
+
+  if ($("tituloFormulario")) {
+    $("tituloFormulario").textContent = "Publica tu producto o servicio";
+  }
+
+  if ($("btnPublicar")) {
+    $("btnPublicar").textContent = "Publicar ahora";
+  }
+
+  mostrarEstado("");
+}
+
+if ($("btnMostrarFormulario")) {
+  $("btnMostrarFormulario").addEventListener("click", () => {
+    cerrarFormulario();
+    abrirFormulario();
+  });
+}
+
+if ($("btnCancelarEdicion")) {
+  $("btnCancelarEdicion").addEventListener("click", cerrarFormulario);
+}
+
+/* VISTA PREVIA DE LA FOTO */
+if ($("imagen")) {
+  $("imagen").addEventListener("change", () => {
+    const archivo = $("imagen").files[0];
+    const vista = $("vistaPrevia");
+
+    if (!vista) return;
+
+    if (!archivo) {
+      if (productoEditandoId && imagenAnterior) {
+        vista.src = imagenAnterior;
+        vista.hidden = false;
+      } else {
+        vista.removeAttribute("src");
+        vista.hidden = true;
+      }
+      return;
+    }
+
+    if (!archivo.type.startsWith("image/")) {
+      mostrarEstado("Selecciona una imagen válida.");
+      $("imagen").value = "";
+      vista.hidden = true;
+      return;
+    }
+
+    vista.src = URL.createObjectURL(archivo);
+    vista.hidden = false;
+  });
 }
 
 /* COMPRIMIR FOTO */
@@ -226,45 +305,15 @@ async function subirFoto(archivo, carpeta, informarEstado = () => {}) {
   return data.publicUrl;
 }
 
-/* PANEL DE PERFIL */
-const panelPerfil = document.createElement("section");
-panelPerfil.className = "panel-perfil";
-panelPerfil.style.cssText =
-  "display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:15px;margin-bottom:20px;";
-
-panelPerfil.innerHTML = `
-  <img id="fotoPerfilActual" alt="Foto de perfil"
-    style="width:55px;height:55px;border-radius:50%;object-fit:cover;display:none;">
-  <strong id="nombrePerfilActual"></strong>
-  <label for="fotoPerfil">Foto de perfil (opcional)</label>
-  <input type="file" id="fotoPerfil" accept="image/*">
-  <button type="button" id="btnGuardarPerfil">Guardar foto</button>
-  <p id="estadoPerfil"></p>
-`;
-
-if (plataforma) plataforma.prepend(panelPerfil);
-
+/* PERFIL DEL VENDEDOR: CONSERVAR WHATSAPP, SIN FOTO DE PERFIL */
 function mostrarPerfil() {
-  const nombre = $("nombrePerfilActual");
-  const foto = $("fotoPerfilActual");
-
-  if (!nombre || !foto) return;
-
-  nombre.textContent = usuarioActual ? `Usuario: ${usuarioActual}` : "";
-
-  const url = perfiles[usuarioActual]?.foto;
-
-  if (url) {
-    foto.src = url;
-    foto.style.display = "block";
-  } else {
-    foto.removeAttribute("src");
-    foto.style.display = "none";
-  }
-
   const campoTelefono = $("telefonoPerfil");
 
-  if (campoTelefono && document.activeElement !== campoTelefono) {
+  if (
+    campoTelefono &&
+    usuarioActual &&
+    document.activeElement !== campoTelefono
+  ) {
     campoTelefono.value = perfiles[usuarioActual]?.telefono || "";
   }
 }
@@ -311,51 +360,6 @@ if ($("btnGuardarTelefono")) {
   });
 }
 
-/* GUARDAR FOTO DE PERFIL */
-if ($("btnGuardarPerfil")) {
-  $("btnGuardarPerfil").addEventListener("click", async () => {
-    if (!usuarioActual) return;
-
-    const archivo = $("fotoPerfil").files[0];
-
-    if (!archivo) {
-      mostrarEstado("Selecciona una foto primero.", "estadoPerfil");
-      return;
-    }
-
-    const boton = $("btnGuardarPerfil");
-    boton.disabled = true;
-
-    try {
-      const foto = await subirFoto(
-        archivo,
-        "perfiles",
-        (texto) => mostrarEstado(texto, "estadoPerfil")
-      );
-
-      mostrarEstado("Guardando perfil en Firebase...", "estadoPerfil");
-
-      await conTiempoLimite(
-        setDoc(doc(db, "perfiles", usuarioActual), {
-          usuario: usuarioActual,
-          foto,
-          actualizado: serverTimestamp()
-        }, { merge: true }),
-        30,
-        "El guardado de la foto en Firebase"
-      );
-
-      $("fotoPerfil").value = "";
-      mostrarEstado("Foto de perfil guardada.", "estadoPerfil");
-    } catch (error) {
-      console.error(error);
-      mostrarEstado("No se pudo guardar la foto: " + error.message, "estadoPerfil");
-    } finally {
-      boton.disabled = false;
-    }
-  });
-}
-
 /* CARGAR PERFILES */
 onSnapshot(
   collection(db, "perfiles"),
@@ -375,7 +379,7 @@ onSnapshot(
   }
 );
 
-/* PUBLICAR PRODUCTOS Y SERVICIOS */
+/* PUBLICAR O GUARDAR CAMBIOS */
 if ($("formProducto")) {
   $("formProducto").addEventListener("submit", async (evento) => {
     evento.preventDefault();
@@ -403,7 +407,7 @@ if ($("formProducto")) {
       return;
     }
 
-    if (!archivo) {
+    if (!productoEditandoId && !archivo) {
       mostrarEstado("Selecciona una foto del producto.");
       return;
     }
@@ -412,33 +416,57 @@ if ($("formProducto")) {
     boton.disabled = true;
 
     try {
-      const imagen = await subirFoto(
-        archivo,
-        "productos",
-        (texto) => mostrarEstado(texto)
-      );
+      let imagen = imagenAnterior;
 
-      mostrarEstado("3/3: Guardando producto en Firebase...");
+      if (archivo) {
+        imagen = await subirFoto(
+          archivo,
+          "productos",
+          (texto) => mostrarEstado(texto)
+        );
+      }
 
-      await conTiempoLimite(
-        addDoc(collection(db, "productos"), {
-          nombre,
-          precio,
-          descripcion,
-          imagen,
-          categoria,
-          vendedor: usuarioActual,
-          creado: serverTimestamp()
-        }),
-        30,
-        "El guardado del producto en Firebase"
-      );
+      if (productoEditandoId) {
+        mostrarEstado("Guardando cambios en Firebase...");
 
-      $("formProducto").reset();
-      mostrarEstado("¡Publicación guardada correctamente!");
+        await conTiempoLimite(
+          updateDoc(doc(db, "productos", productoEditandoId), {
+            nombre,
+            precio,
+            descripcion,
+            imagen,
+            categoria,
+            actualizado: serverTimestamp()
+          }),
+          30,
+          "La edición de la publicación"
+        );
+
+        mostrarEstado("¡Publicación actualizada correctamente!");
+      } else {
+        mostrarEstado("3/3: Guardando producto en Firebase...");
+
+        await conTiempoLimite(
+          addDoc(collection(db, "productos"), {
+            nombre,
+            precio,
+            descripcion,
+            imagen,
+            categoria,
+            vendedor: usuarioActual,
+            creado: serverTimestamp()
+          }),
+          30,
+          "El guardado del producto en Firebase"
+        );
+
+        mostrarEstado("¡Publicación guardada correctamente!");
+      }
+
+      cerrarFormulario();
     } catch (error) {
-      console.error("Error al publicar:", error);
-      mostrarEstado("No se pudo publicar: " + error.message);
+      console.error("Error al guardar la publicación:", error);
+      mostrarEstado("No se pudo guardar: " + error.message);
     } finally {
       boton.disabled = false;
     }
@@ -468,7 +496,7 @@ onSnapshot(
   }
 );
 
-/* PREPARAR NUMERO DE WHATSAPP */
+/* PREPARAR NÚMERO DE WHATSAPP */
 function prepararNumeroWhatsApp(telefono) {
   let numero = String(telefono || "").replace(/\D/g, "");
 
@@ -490,6 +518,39 @@ function normalizarTexto(texto) {
     .trim();
 }
 
+/* EDITAR UNA PUBLICACIÓN PROPIA */
+function editarProducto(producto) {
+  if (producto.vendedor !== usuarioActual) {
+    mostrarEstado("Solo puedes editar tus propias publicaciones.");
+    return;
+  }
+
+  productoEditandoId = producto.id;
+  imagenAnterior = producto.imagen || "";
+
+  $("nombre").value = producto.nombre || "";
+  $("precio").value = producto.precio ?? "";
+  $("descripcion").value = producto.descripcion || "";
+  $("categoria").value = producto.categoria || "Productos";
+  $("imagen").value = "";
+
+  const vista = $("vistaPrevia");
+
+  if (vista && imagenAnterior) {
+    vista.src = imagenAnterior;
+    vista.hidden = false;
+  } else if (vista) {
+    vista.removeAttribute("src");
+    vista.hidden = true;
+  }
+
+  $("tituloFormulario").textContent = "Editar publicación";
+  $("btnPublicar").textContent = "Guardar cambios";
+
+  mostrarEstado("Modifica los datos que quieras cambiar.");
+  abrirFormulario();
+}
+
 /* MOSTRAR PUBLICACIONES */
 function mostrarProductos() {
   const lista = $("lista");
@@ -497,8 +558,15 @@ function mostrarProductos() {
 
   lista.replaceChildren();
 
+  const textoBuscado = normalizarTexto(busquedaActual);
+
   const encontrados = productos.filter((producto) => {
+    /*
+      Si hay una búsqueda, se busca en TODAS las categorías,
+      aunque el filtro esté seleccionado en Productos o Servicios.
+    */
     const coincideCategoria =
+      textoBuscado !== "" ||
       filtroActual === "Todos" ||
       producto.categoria === filtroActual;
 
@@ -507,8 +575,7 @@ function mostrarProductos() {
     );
 
     const coincideBusqueda =
-      !busquedaActual ||
-      textoProducto.includes(normalizarTexto(busquedaActual));
+      !textoBuscado || textoProducto.includes(textoBuscado);
 
     return coincideCategoria && coincideBusqueda;
   });
@@ -516,7 +583,7 @@ function mostrarProductos() {
   if (!encontrados.length) {
     const mensaje = document.createElement("p");
 
-    if (busquedaActual) {
+    if (textoBuscado) {
       mensaje.textContent = "No se encontraron resultados para tu búsqueda.";
     } else {
       mensaje.textContent = "Todavía no hay publicaciones en esta categoría.";
@@ -536,17 +603,6 @@ function mostrarProductos() {
     encabezado.style.cssText =
       "display:flex;align-items:center;gap:10px;padding:12px;";
 
-    const perfil = perfiles[producto.vendedor];
-
-    if (perfil?.foto) {
-      const avatar = document.createElement("img");
-      avatar.src = perfil.foto;
-      avatar.alt = "Foto de perfil";
-      avatar.style.cssText =
-        "width:42px;height:42px;border-radius:50%;object-fit:cover;";
-      encabezado.appendChild(avatar);
-    }
-
     const vendedor = document.createElement("strong");
     vendedor.textContent = producto.vendedor || "Usuario";
     encabezado.appendChild(vendedor);
@@ -558,7 +614,7 @@ function mostrarProductos() {
       foto.alt = producto.nombre || "Foto del producto";
       foto.loading = "lazy";
       foto.style.cssText =
-        "display:block;width:100%;max-height:500px;object-fit:contain;background:#f5f5f5;";
+        "display:block;width:100%;height:190px;object-fit:cover;background:#f5f5f5;";
       tarjeta.appendChild(foto);
     }
 
@@ -620,13 +676,25 @@ function mostrarProductos() {
       tarjeta.appendChild(botonContactar);
     }
 
-    /* ELIMINAR PUBLICACIONES PROPIAS */
+    /* EDITAR Y ELIMINAR PUBLICACIONES PROPIAS */
     if (usuarioActual && producto.vendedor === usuarioActual) {
+      const botonEditar = document.createElement("button");
+      botonEditar.type = "button";
+      botonEditar.textContent = "✏️ Editar publicación";
+      botonEditar.style.cssText =
+        "display:block;width:calc(100% - 28px);margin:0 14px 10px;padding:10px 14px;background:#2369a8;color:white;border:0;border-radius:6px;cursor:pointer;";
+
+      botonEditar.addEventListener("click", () => {
+        editarProducto(producto);
+      });
+
+      tarjeta.appendChild(botonEditar);
+
       const botonEliminar = document.createElement("button");
       botonEliminar.type = "button";
       botonEliminar.textContent = "🗑️ Eliminar publicación";
       botonEliminar.style.cssText =
-        "display:block;margin:0 14px 14px;padding:10px 14px;background:#dc2626;color:white;border:0;border-radius:6px;cursor:pointer;";
+        "display:block;width:calc(100% - 28px);margin:0 14px 14px;padding:10px 14px;background:#dc2626;color:white;border:0;border-radius:6px;cursor:pointer;";
 
       botonEliminar.addEventListener("click", async () => {
         if (!confirm(`¿Seguro que quieres eliminar "${producto.nombre}"?`)) return;
@@ -665,7 +733,7 @@ if ($("filtro")) {
   });
 }
 
-/* BUSCADOR DE PRODUCTOS Y SERVICIOS */
+/* BUSCADOR: PRIORIZA LA BÚSQUEDA EN TODAS LAS CATEGORÍAS */
 if ($("buscador")) {
   $("buscador").addEventListener("input", (evento) => {
     busquedaActual = evento.target.value;
