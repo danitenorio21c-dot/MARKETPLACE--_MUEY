@@ -208,11 +208,17 @@ button:active {
 .lista-productos {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: stretch;
   gap: 20px;
   margin-top: 25px;
 }
 
 .producto {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
   padding: 15px;
   overflow: hidden;
   background: white;
@@ -224,8 +230,9 @@ button:active {
 .producto img {
   display: block;
   width: 100%;
-  height: 190px;
-  object-fit: cover;
+  height: 190px !important;
+  min-height: 190px;
+  object-fit: cover !important;
   background: #eaf0f6;
   border-radius: 10px;
 }
@@ -233,6 +240,7 @@ button:active {
 .producto h3 {
   margin: 14px 0 8px;
   color: var(--azul);
+  overflow-wrap: anywhere;
 }
 
 .producto p {
@@ -357,4 +365,22 @@ button:active {
   .lista-productos {
     grid-template-columns: 1fr;
   }
+}
+
+/* Ajustes para mantener uniformes las tarjetas y sus fotos */
+.lista-productos {
+  align-items: stretch;
+}
+
+.producto {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.producto img {
+  width: 100%;
+  height: 190px !important;
+  min-height: 190px;
+  object-fit: cover !important;
 }
