@@ -15,6 +15,7 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -23,18 +24,20 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   color: var(--texto);
   background:
-    linear-gradient(rgba(238, 243, 249, 0.91), rgba(238, 243, 249, 0.94)),
+    linear-gradient(rgba(238, 243, 249, 0.88), rgba(238, 243, 249, 0.92)),
     url("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRnXUdOmpCJbuebVS9i8m68C7qo8svD-TCm5XgkoJfRZA&s=10")
     center 180px / 330px auto no-repeat fixed,
     var(--fondo);
 }
 
+/* ENCABEZADO Y ESCUDO */
 .encabezado {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 24px;
-  padding: 30px 20px;
+  width: 100%;
+  padding: 28px 20px;
   color: white;
   text-align: center;
   background: linear-gradient(135deg, #102d4d, #2369a8);
@@ -55,21 +58,29 @@ body {
 }
 
 .logo-colegio img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
   border-radius: 50%;
 }
 
+.titulo-principal {
+  min-width: 0;
+}
+
 .titulo-principal h1 {
   margin: 5px 0 10px;
-  font-size: clamp(25px, 4vw, 42px);
+  font-size: clamp(24px, 4vw, 42px);
+  line-height: 1.2;
   letter-spacing: 1px;
+  overflow-wrap: anywhere;
 }
 
 .titulo-principal p {
   margin: 6px 0;
   color: #f4f7fc;
+  line-height: 1.5;
 }
 
 .titulo-principal .subtitulo {
@@ -79,15 +90,17 @@ body {
   letter-spacing: 3px;
 }
 
+/* CONTENIDO PRINCIPAL */
 .contenedor-principal {
-  width: min(1050px, 94%);
+  width: min(1200px, 94%);
   margin: 30px auto;
 }
 
 .panel {
+  min-width: 0;
   margin-bottom: 25px;
-  padding: 25px;
-  background: rgba(255, 255, 255, 0.94);
+  padding: clamp(17px, 3vw, 28px);
+  background: rgba(255, 255, 255, 0.96);
   border: 1px solid var(--borde);
   border-radius: 18px;
   box-shadow: 0 7px 25px rgba(27, 57, 88, 0.09);
@@ -96,24 +109,30 @@ body {
 .panel h2 {
   margin-top: 0;
   color: var(--azul);
-  font-size: 23px;
+  font-size: clamp(20px, 2.5vw, 25px);
+  overflow-wrap: anywhere;
 }
 
 .panel p {
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
+/* CAMPOS Y FORMULARIOS */
 label {
   display: block;
   margin: 15px 0 7px;
-  font-weight: bold;
   font-size: 14px;
+  font-weight: bold;
 }
 
 input,
 textarea,
 select {
+  display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 12px 14px;
   color: var(--texto);
   font: inherit;
@@ -135,33 +154,52 @@ textarea {
   resize: vertical;
 }
 
+input[type="file"] {
+  padding: 10px;
+  font-size: 14px;
+}
+
 button {
+  max-width: 100%;
+  min-height: 44px;
   padding: 12px 18px;
   color: white;
   font: inherit;
   font-weight: bold;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
   background: linear-gradient(135deg, var(--azul-claro), var(--azul));
   border: none;
   border-radius: 10px;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
+  touch-action: manipulation;
 }
 
 button:hover {
-  transform: translateY(-2px);
   box-shadow: 0 5px 12px rgba(18, 59, 101, 0.2);
 }
 
 button:active {
-  transform: translateY(0);
+  transform: scale(0.98);
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+#btnMostrarFormulario,
+#btnGuardarTelefono {
+  margin-top: 10px;
 }
 
 #formProducto button {
   width: 100%;
-  margin-top: 18px;
+  margin-top: 14px;
   padding: 14px;
-  background: linear-gradient(135deg, #f4b942, #e69b18);
   color: #18314b;
+  background: linear-gradient(135deg, #f4b942, #e69b18);
 }
 
 .botones-login {
@@ -171,17 +209,22 @@ button:active {
   margin-top: 20px;
 }
 
+.botones-login button {
+  flex: 1 1 160px;
+}
+
 .boton-secundario {
   color: var(--azul);
   background: #e7eff8;
   border: 1px solid #cbd9e9;
 }
 
+/* BIENVENIDA */
 .bienvenida {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 15px;
+  gap: 18px;
   background: linear-gradient(135deg, #ffffff, #eaf2fb);
   border-left: 5px solid var(--dorado);
 }
@@ -190,24 +233,35 @@ button:active {
   margin-bottom: 5px;
 }
 
+.bienvenida p {
+  margin-bottom: 0;
+}
+
+/* FILTRO Y BUSCADOR */
 .titulo-seccion {
   display: grid;
-  grid-template-columns: 1fr minmax(150px, 220px);
+  grid-template-columns: auto minmax(150px, 220px);
   align-items: center;
-  gap: 15px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
-.titulo-seccion h2 {
-  margin-bottom: 5px;
+.titulo-seccion label {
+  margin: 0;
 }
 
-.titulo-seccion p {
-  margin-top: 5px;
+.titulo-seccion select {
+  width: 100%;
 }
 
+#buscador {
+  margin-bottom: 10px;
+}
+
+/* PUBLICACIONES ADAPTABLES */
 .lista-productos {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
   gap: 20px;
   margin-top: 25px;
@@ -218,33 +272,58 @@ button:active {
   flex-direction: column;
   width: 100%;
   min-width: 0;
+  max-width: none !important;
   height: 100%;
-  padding: 15px;
+  margin: 0 !important;
+  padding: 14px;
   overflow: hidden;
+  color: var(--texto);
   background: white;
   border: 1px solid var(--borde);
   border-radius: 15px;
   box-shadow: 0 4px 14px rgba(27, 57, 88, 0.08);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.producto:hover {
+  box-shadow: 0 8px 22px rgba(27, 57, 88, 0.14);
 }
 
 .producto img {
   display: block;
   width: 100%;
   height: 190px !important;
-  min-height: 190px;
+  min-height: 0;
+  flex-shrink: 0;
   object-fit: cover !important;
   background: #eaf0f6;
   border-radius: 10px;
 }
 
 .producto h3 {
-  margin: 14px 0 8px;
+  margin: 12px 0 8px;
   color: var(--azul);
+  font-size: 22px;
   overflow-wrap: anywhere;
 }
 
-.producto p {
+.producto strong,
+.producto p,
+.producto span {
   overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.producto p {
+  line-height: 1.5;
+}
+
+.producto button {
+  flex-shrink: 0;
+}
+
+.producto button:last-child {
+  margin-top: auto;
 }
 
 .producto .precio {
@@ -255,6 +334,8 @@ button:active {
 
 .producto .categoria {
   display: inline-block;
+  align-self: flex-start;
+  margin-top: 10px;
   padding: 6px 10px;
   color: var(--azul);
   font-size: 12px;
@@ -263,7 +344,9 @@ button:active {
   border-radius: 20px;
 }
 
+/* CHAT, SI SE UTILIZA EN OTRA SECCIÓN */
 .chat {
+  min-width: 0;
   padding: 15px;
   background: #f3f7fc;
   border: 1px solid var(--borde);
@@ -293,12 +376,16 @@ button:active {
 
 #estado,
 #mensajeLogin,
-#estadoChat {
+#estadoChat,
+#estadoTelefono {
   color: var(--azul);
   font-weight: bold;
+  overflow-wrap: anywhere;
 }
 
+/* FRASE Y PIE DE PÁGINA */
 .pie-pagina {
+  width: 100%;
   padding: 22px 15px;
   color: white;
   text-align: center;
@@ -309,49 +396,125 @@ button:active {
 .pie-pagina p {
   margin: 5px;
   font-size: 13px;
+  line-height: 1.5;
 }
 
+/* RESPETAR ELEMENTOS OCULTOS */
 [hidden] {
   display: none !important;
 }
 
-@media (max-width: 600px) {
-  .encabezado {
-    flex-direction: column;
-    gap: 12px;
-    padding: 24px 12px;
-  }
-
-  .logo-colegio {
-    width: 85px;
-    height: 85px;
-  }
-
-  .titulo-principal h1 {
-    font-size: 27px;
-  }
-
-  .titulo-principal .subtitulo {
-    letter-spacing: 1px;
+/* TABLETS Y COMPUTADORAS PEQUEÑAS */
+@media (max-width: 900px) {
+  .lista-productos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
   }
 
   .contenedor-principal {
-    width: 94%;
+    width: 95%;
+  }
+
+  .producto img {
+    height: 180px !important;
+  }
+}
+
+/* CELULARES */
+@media (max-width: 600px) {
+  body {
+    background:
+      linear-gradient(rgba(238, 243, 249, 0.90), rgba(238, 243, 249, 0.94)),
+      url("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRnXUdOmpCJbuebVS9i8m68C7qo8svD-TCm5XgkoJfRZA&s=10")
+      center 150px / 240px auto no-repeat fixed,
+      var(--fondo);
+  }
+
+  .encabezado {
+    flex-direction: column;
+    gap: 12px;
+    padding: 22px 12px;
+  }
+
+  .logo-colegio {
+    width: 82px;
+    height: 82px;
+  }
+
+  .titulo-principal {
+    width: 100%;
+  }
+
+  .titulo-principal h1 {
+    font-size: clamp(23px, 7vw, 30px);
+    letter-spacing: 0.5px;
+  }
+
+  .titulo-principal .subtitulo {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+  }
+
+  .contenedor-principal {
+    width: calc(100% - 20px);
     margin: 18px auto;
   }
 
   .panel {
-    padding: 17px;
+    padding: 16px;
+    margin-bottom: 18px;
     border-radius: 14px;
   }
 
   .bienvenida {
-    align-items: flex-start;
+    align-items: stretch;
     flex-direction: column;
+  }
+
+  .bienvenida button {
+    width: 100%;
   }
 
   .titulo-seccion {
     grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .lista-productos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .producto {
+    padding: 9px;
+    border-radius: 12px;
+  }
+
+  .producto img {
+    height: 125px !important;
+    border-radius: 8px;
+  }
+
+  .producto h3 {
+    margin: 10px 0 6px;
+    font-size: 18px;
+  }
+
+  .producto p {
+    font-size: 13px;
+  }
+
+  .producto button {
+    width: 100%;
+    margin-right: 0 !important;
+    margin-left: 0 !important;
+    padding: 10px 7px;
+    font-size: 12px;
+  }
+
+  .producto .categoria {
+    font-size: 11px;
   }
 
   #formChat {
@@ -362,25 +525,52 @@ button:active {
     width: 100%;
   }
 
-  .lista-productos {
-    grid-template-columns: 1fr;
+  .pie-pagina {
+    padding: 20px 12px;
   }
 }
 
-/* Ajustes para mantener uniformes las tarjetas y sus fotos */
-.lista-productos {
-  align-items: stretch;
+/* CELULARES MUY ESTRECHOS */
+@media (max-width: 360px) {
+  .lista-productos {
+    grid-template-columns: 1fr;
+  }
+
+  .producto img {
+    height: 190px !important;
+  }
+
+  .botones-login {
+    flex-direction: column;
+  }
+
+  .botones-login button {
+    width: 100%;
+  }
+
+  .titulo-principal .subtitulo {
+    letter-spacing: 1px;
+  }
 }
 
-.producto {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+/* DISPOSITIVOS SIN RATÓN */
+@media (hover: none) {
+  button:hover,
+  .producto:hover {
+    transform: none;
+    box-shadow: 0 4px 14px rgba(27, 57, 88, 0.08);
+  }
 }
 
-.producto img {
-  width: 100%;
-  height: 190px !important;
-  min-height: 190px;
-  object-fit: cover !important;
+/* RESPETAR PREFERENCIA DE MOVIMIENTO REDUCIDO */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
 }
