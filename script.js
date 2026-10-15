@@ -24,6 +24,7 @@ let usuarioActual = localStorage.getItem("usuarioActual") || "";
 let productos = [];
 let perfiles = {};
 let filtroActual = "Todos";
+let busquedaActual = "";
 
 const seccionLogin = $("seccionLogin");
 const plataforma = $("plataforma");
@@ -480,6 +481,15 @@ function prepararNumeroWhatsApp(telefono) {
   return numero;
 }
 
+/* NORMALIZAR TEXTO PARA BUSCAR CON O SIN TILDES */
+function normalizarTexto(texto) {
+  return String(texto || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
 /* MOSTRAR PUBLICACIONES */
 function mostrarProductos() {
   const lista = $("lista");
@@ -487,15 +497,31 @@ function mostrarProductos() {
 
   lista.replaceChildren();
 
-  const encontrados = productos.filter(
-    (producto) =>
+  const encontrados = productos.filter((producto) => {
+    const coincideCategoria =
       filtroActual === "Todos" ||
-      producto.categoria === filtroActual
-  );
+      producto.categoria === filtroActual;
+
+    const textoProducto = normalizarTexto(
+      `${producto.nombre || ""} ${producto.descripcion || ""} ${producto.categoria || ""}`
+    );
+
+    const coincideBusqueda =
+      !busquedaActual ||
+      textoProducto.includes(normalizarTexto(busquedaActual));
+
+    return coincideCategoria && coincideBusqueda;
+  });
 
   if (!encontrados.length) {
     const mensaje = document.createElement("p");
-    mensaje.textContent = "Todavía no hay publicaciones en esta categoría.";
+
+    if (busquedaActual) {
+      mensaje.textContent = "No se encontraron resultados para tu búsqueda.";
+    } else {
+      mensaje.textContent = "Todavía no hay publicaciones en esta categoría.";
+    }
+
     lista.appendChild(mensaje);
     return;
   }
@@ -639,21 +665,11 @@ if ($("filtro")) {
   });
 }
 
-/* CHAT LOCAL: NO ES UN CHAT COMPARTIDO ENTRE DISPOSITIVOS */
-if ($("formChat")) {
-  $("formChat").addEventListener("submit", (evento) => {
-    evento.preventDefault();
-
-    const campo = $("mensaje");
-    const texto = campo.value.trim();
-
-    if (!texto || !usuarioActual) return;
-
-    const mensaje = document.createElement("p");
-    mensaje.textContent = `${usuarioActual}: ${texto}`;
-    $("mensajes").appendChild(mensaje);
-
-    campo.value = "";
+/* BUSCADOR DE PRODUCTOS Y SERVICIOS */
+if ($("buscador")) {
+  $("buscador").addEventListener("input", (evento) => {
+    busquedaActual = evento.target.value;
+    mostrarProductos();
   });
 }
 
