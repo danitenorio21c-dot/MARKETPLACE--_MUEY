@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -163,31 +162,20 @@
           </select>
         </div>
 
+        <!-- BUSCADOR DE PRODUCTOS Y SERVICIOS -->
+        <label for="buscador">Buscar productos o servicios</label>
+        <input
+          type="search"
+          id="buscador"
+          placeholder="Ej.: juguetes, televisores, camisetas, mecánico..."
+          autocomplete="off"
+        >
+
         <div id="lista" class="lista-productos">
           <p>Cargando publicaciones...</p>
         </div>
       </section>
 
-      <section class="panel">
-        <h2>Mensajes</h2>
-        <p>Espacio para comunicarte con otros usuarios.</p>
-
-        <div id="chat" class="chat">
-          <div id="mensajes" class="mensajes"></div>
-
-          <form id="formChat">
-            <input
-              type="text"
-              id="mensaje"
-              placeholder="Escribe un mensaje..."
-              autocomplete="off"
-            >
-            <button type="submit">Enviar</button>
-          </form>
-        </div>
-
-        <p id="estadoChat" role="status"></p>
-      </section>
     </section>
   </main>
 
